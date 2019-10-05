@@ -2,7 +2,6 @@ import { Schema, Field, FieldType } from './schema';
 
 interface SchemaPlus extends Schema {
   nullBytes: number;
-  selfDescribing?: boolean;
 }
 
 export function pack<T = any>(rows: T[], inSchema: Schema): ArrayBuffer {
