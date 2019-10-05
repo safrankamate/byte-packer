@@ -1,0 +1,20 @@
+{
+  "name": "byte-packer",
+  "version": "1.0.0",
+  "description": "Pack arrays of similar objects into a binary format for transportation.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/safrankamate/byte-packer.git"
+  },
+  "author": {
+    "name": "Mate Safranka",
+    "email": "safranka.mate@gmail.com",
+    "url": "https://github.com/safrankamate"
+  },
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "types/index.d.ts",
+  "scripts": {
+    "build": "tsc --outDir dist -d --declarationDir types -t esnext -m commonjs src/index.ts"
+  }
+}
