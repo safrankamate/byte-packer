@@ -1,10 +1,13 @@
 import { Schema, Field, FieldType } from './schema';
+import { validatePack, validateValue } from './validate';
 
 interface SchemaPlus extends Schema {
   nullBytes: number;
 }
 
 export function pack<T = any>(rows: T[], inSchema: Schema): ArrayBuffer {
+  validatePack(rows, inSchema);
+
   const schema: SchemaPlus = {
     ...inSchema,
     nullBytes: countNullables(inSchema.fields),
@@ -148,6 +151,8 @@ function packValue(
   view?: DataView,
   i?: number,
 ): number {
+  validateValue(value, field);
+
   if (value === null || value === undefined) {
     return 0;
   }

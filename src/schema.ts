@@ -27,3 +27,13 @@ export type TypeDef =
       type: EnumType;
       enumOf: string[];
     };
+
+export const Types: Record<string, FieldType> = {
+  Int8: 'int8',
+  Int16: 'int16',
+  Int32: 'int32',
+  Float: 'float',
+  Boolean: 'boolean',
+  String: 'string',
+  Enum: 'enum',
+};
