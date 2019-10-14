@@ -1,6 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const validate_1 = require("./validate");
 function pack(rows, inSchema) {
+    validate_1.validatePack(rows, inSchema);
     const schema = {
         ...inSchema,
         nullBytes: countNullables(inSchema.fields),
@@ -99,6 +101,7 @@ function packRow({ fields, nullBytes }, row, view, i0) {
     return i - i0;
 }
 function packValue(field, value, view, i) {
+    validate_1.validateValue(value, field);
     if (value === null || value === undefined) {
         return 0;
     }

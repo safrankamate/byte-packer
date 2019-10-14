@@ -15,3 +15,4 @@ export declare type TypeDef = {
     type: EnumType;
     enumOf: string[];
 };
+export declare const Types: Record<string, FieldType>;
