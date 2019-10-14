@@ -1,4 +1,5 @@
 import { Schema, Field, FieldType } from './schema';
+import { validateSchema, fail } from './validate';
 
 interface SchemaPlus extends Schema {
   nullBytes: number;
@@ -20,6 +21,8 @@ export function unpack<T = any>(buffer: ArrayBuffer, inSchema?: Schema): T[] {
     throw Error(
       'unpack() - The schema parameter can only be omitted for self-describing payloads.',
     );
+  } else {
+    validateSchema(inSchema);
   }
 
   const rows: T[] = [];
@@ -67,6 +70,8 @@ const CodeTypes: FieldType[] = [
 function unpackField(view: DataView, fields: Field[], i0: number): number {
   const typeByte = view.getUint8(i0);
   const type: FieldType = CodeTypes[typeByte & 0b00001111];
+  if (!type) fail(`Invalid type byte ${typeByte} as index ${i0}`);
+
   const nullable = !!(typeByte & HIGH_1);
   const [name, nameLength] = unpackString(view, i0 + 1);
 
@@ -76,6 +81,9 @@ function unpackField(view: DataView, fields: Field[], i0: number): number {
   if (field.type === 'enum') {
     field.enumOf = [];
     const optionCount = view.getUint8(i++);
+    if (optionCount === 0)
+      fail(`Enum field ${name} in self-describing schema has option count 0.`);
+
     for (let o = 0; o < optionCount; o++) {
       const [option, optionLength] = unpackString(view, i);
       field.enumOf.push(option);
@@ -165,7 +173,11 @@ function unpackChar(view: DataView, i: number, codes: number[]): number {
   code = first >>> bytes;
 
   for (let b = 1; b < bytes; b++) {
-    code = (code << 6) | (view.getUint8(i + b) & 0b00111111);
+    const byte = view.getUint8(i + b);
+    if ((byte & 0b11000000) !== HIGH_1)
+      fail(`Byte at index ${i + b} is not part of a valid UTF-8 character.`);
+
+    code = (code << 6) | (byte & 0b00111111);
   }
   codes.push(code);
 

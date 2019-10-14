@@ -4,6 +4,7 @@ const schema_1 = require("./schema");
 function fail(message) {
     throw Error(`byte-packer: ${message}`);
 }
+exports.fail = fail;
 const FieldTypes = new Set(Object.values(schema_1.Types));
 function validatePack(rows, schema) {
     if (!Array.isArray(rows)) {

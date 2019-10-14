@@ -1,6 +1,6 @@
 import { Schema, Types, Field } from './schema';
 
-function fail(message: string): never {
+export function fail(message: string): never {
   throw Error(`byte-packer: ${message}`);
 }
 
