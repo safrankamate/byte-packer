@@ -1,6 +1,6 @@
 {
   "name": "byte-packer",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Pack arrays of similar objects into a binary format for transportation.",
   "repository": {
     "type": "git",
@@ -12,6 +12,12 @@
     "url": "https://github.com/safrankamate"
   },
   "license": "MIT",
+  "keywords": [
+    "json",
+    "compression",
+    "binary",
+    "transfer"
+  ],
   "main": "dist/index.js",
   "types": "types/index.d.ts",
   "scripts": {
