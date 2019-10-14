@@ -323,36 +323,6 @@ With this schema, each object will be prefixed with 1 null byte (2 nullable fiel
 
 The following sections describe potential improvements to the library. Feel free to offer comments or suggestions as Issues.
 
-## Error handling
-
-Currently, the only intentional exception is thrown when `unpack()` is called without a schema for a non-self-describing payload. In all other cases, the library naively assumes that all schemas, input objects and payloads are valid. If something does go wrong, the resulting exception is likely to be difficult to interpret (and subsequently debug) for anyone who is not intimately familiar with the library's implementation. The following validations and proactive exceptions may make the library more user-friendly:
-
-- `pack()`:
-
-  - Assert that `objects` is an array.
-  - Assert that `schema` is an object, and has a `fields` property, which is an array.
-  - For each field:
-    - Assert that the field has a `name` property, which is a non-empty string.
-    - Assert that the field has a `type` property, which is one of the allowed types.
-    - Assert that if the field's `type` is `enum`, then it has an `enumOf` property, and that:
-      - it is a non-empty array of strings
-      - all of its items are unique
-  - For each item in the array during processing:
-    - Assert that it is an object.
-    - Assert that each field listed in the schema has the correct value type.
-    - Assert that non-nullable fields have non-nullish (`null` or `undefined`) values.
-    - Assert that fields of an `enum` type have a string value that is included in the array included in the schema.
-
-- `unpack()`:
-  - Assert that `payload` is an `ArrayBuffer`.
-  - If `schema` is present, validate it the same way as described above.
-  - In a self-describing payload:
-    - Assert that each field has a valid type.
-    - Assert that each field with an `enum` type has a non-zero option count.
-  - When processing values:
-    - Assert that strings are in valid UTF-8 format.
-    - Assert that boolean values are either 1 or 0.
-
 ## Tests
 
 Currently, tests are written in plain NodeJS, and only serve to test basic functionality. A more thorough suite of tests would be desirable, adhering to the following requirements:
