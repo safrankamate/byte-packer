@@ -69,13 +69,14 @@ function measureRow(fields: Field[], row: any): number {
 }
 
 function measureValue(field: Field, value: any): number {
-  if (field.nullable && (value === null || value === undefined)) return 0;
+  if (value === null || value === undefined) return 0;
   return packValue(field, value);
 }
 
 // Packing
 
 const HIGH_1 = 0b10000000;
+const LOW_BITS = 0b00111111;
 
 function packSchema(fields: Field[], view: DataView, i0: number): number {
   view.setUint8(0, view.getUint8(0) | HIGH_1);
@@ -160,6 +161,18 @@ function packValue(
     case 'int32':
       view && view.setInt32(i, value);
       return 4;
+    case 'uint8':
+      view && view.setUint8(i, value);
+      return 1;
+    case 'uint16':
+      view && view.setUint16(i, value);
+      return 2;
+    case 'uint32':
+      view && view.setUint32(i, value);
+      return 4;
+    case 'varint':
+      const bytes = packVarInt(value, view, i);
+      return bytes;
     case 'float':
       view && view.setFloat32(i, value);
       return 4;
@@ -181,36 +194,40 @@ function packString(value: string, view?: DataView, i0?: number): number {
   for (let c = 0; c < value.length; c++) {
     const i = i0 + bytes;
     const code = value.codePointAt(c);
-    if (code < 0x80) {
-      bytes += 1;
-      if (view) {
-        view.setUint8(i, code);
-      }
-    } else if (code < 0x800) {
-      bytes += 2;
-      if (view) {
-        view.setUint8(i, 0b11000000 & (code >>> 6));
-        view.setUint8(i + 1, HIGH_1 & code);
-      }
-    } else if (code < 0x10000) {
-      bytes += 3;
-      if (view) {
-        view.setUint8(i, 0b11100000 & (code >>> 12));
-        view.setUint8(i + 1, HIGH_1 & (code >>> 6));
-        view.setUint8(i + 2, HIGH_1 & code);
-      }
-    } else if (code < 0x11000) {
-      bytes += 4;
-      if (view) {
-        view.setUint8(i, 0b11110000 & (code >>> 18));
-        view.setUint8(i + 1, HIGH_1 & (code >>> 12));
-        view.setUint8(i + 2, HIGH_1 & (code >>> 6));
-        view.setUint8(i + 3, HIGH_1 & code);
-      }
-    }
+    bytes += packVarInt(code, view, i);
   }
   if (view) {
     view.setUint8(i0 + bytes, 0);
   }
   return bytes + 1;
+}
+
+function packVarInt(value: number, view: DataView, i: number): number {
+  if (value < 0x80) {
+    if (view) {
+      view.setUint8(i, value);
+    }
+    return 1;
+  } else if (value < 0x800) {
+    if (view) {
+      view.setUint8(i, 0b11000000 | (value >>> 6));
+      view.setUint8(i + 1, HIGH_1 | (value & LOW_BITS));
+    }
+    return 2;
+  } else if (value < 0x10000) {
+    if (view) {
+      view.setUint8(i, 0b11100000 | (value >>> 12));
+      view.setUint8(i + 1, HIGH_1 | ((value >>> 6) & LOW_BITS));
+      view.setUint8(i + 2, HIGH_1 | (value & LOW_BITS));
+    }
+    return 3;
+  } else if (value < 0x10ffff) {
+    if (view) {
+      view.setUint8(i, 0b11110000 | (value >>> 18));
+      view.setUint8(i + 1, HIGH_1 | ((value >>> 12) & LOW_BITS));
+      view.setUint8(i + 2, HIGH_1 | ((value >>> 6) & LOW_BITS));
+      view.setUint8(i + 3, HIGH_1 | (value & LOW_BITS));
+    }
+    return 4;
+  }
 }

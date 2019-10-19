@@ -51,7 +51,16 @@ const rejectEnum = (name, enumOf) => (!Array.isArray(enumOf) &&
 const rejectNull = (value, { nullable }) => !nullable &&
     (value === null || value === undefined) &&
     'Unallowed nullish value';
-const rejectValue = (value, { type, nullable, ...field }) => ((type === 'int8' || type === 'int16' || type === 'int32') &&
+const IntegerTypes = new Set([
+    'int8',
+    'int16',
+    'int32',
+    'uint8',
+    'uin16',
+    'uint32',
+    'varint',
+]);
+const rejectValue = (value, { type, nullable, ...field }) => (IntegerTypes.has(type) &&
     !Number.isInteger(value) &&
     `Non-integer value ${value}`) ||
     (type === 'int8' &&
@@ -59,6 +68,15 @@ const rejectValue = (value, { type, nullable, ...field }) => ((type === 'int8' |
         `Out-of-range value ${value}`) ||
     (type === 'int16' &&
         (value < -32768 || value > 32767) &&
+        `Out-of-range value ${value}`) ||
+    (type === 'uint8' &&
+        (value < 0 || value > 255) &&
+        `Out-of-range value ${value}`) ||
+    (type === 'uint16' &&
+        (value < 0 || value > 65535) &&
+        `Out-of-range value ${value}`) ||
+    (type === 'varint' &&
+        (value < 0 || value > 0x10ffff) &&
         `Out-of-range value ${value}`) ||
     (type === 'float' &&
         !Number.isFinite(value) &&

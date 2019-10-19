@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const schema_1 = require("./schema");
 const validate_1 = require("./validate");
 function unpack(buffer, inSchema) {
     const schema = {
@@ -41,19 +42,9 @@ function unpackSchema(view, fields, i0) {
     }
     return i - i0;
 }
-const CodeTypes = [
-    undefined,
-    'int8',
-    'int16',
-    'int32',
-    'float',
-    'boolean',
-    'string',
-    'enum',
-];
 function unpackField(view, fields, i0) {
     const typeByte = view.getUint8(i0);
-    const type = CodeTypes[typeByte & 0b00001111];
+    const type = schema_1.TypeCodes[typeByte & 0b00001111];
     if (!type)
         validate_1.fail(`Invalid type byte ${typeByte} as index ${i0}`);
     const nullable = !!(typeByte & HIGH_1);
@@ -105,6 +96,12 @@ function unpackValue(field, view, i) {
             return [view.getInt16(i), 2];
         case 'int32':
             return [view.getInt32(i), 4];
+        case 'uint8':
+            return [view.getUint8(i), 1];
+        case 'uint16':
+            return [view.getUint16(i), 2];
+        case 'uint32':
+            return [view.getUint32(i), 4];
         case 'float':
             return [view.getFloat32(i), 4];
         case 'boolean':
@@ -113,33 +110,37 @@ function unpackValue(field, view, i) {
             return [field.enumOf[view.getInt8(i)], 1];
         case 'string':
             return unpackString(view, i);
+        case 'varint':
+            const drop = [];
+            const bytes = unpackVarInt(view, i, drop);
+            return [drop[0], bytes];
     }
 }
 function unpackString(view, i0) {
     const codes = [];
     let i = i0;
     while (view.getUint8(i) !== 0) {
-        i += unpackChar(view, i, codes);
+        i += unpackVarInt(view, i, codes);
         if (i === i0)
             break;
     }
     return [String.fromCharCode(...codes), i - i0 + 1];
 }
-function unpackChar(view, i, codes) {
-    let code = 0;
+function unpackVarInt(view, i, codes) {
+    let value = 0;
     let bytes = 0;
     let first = view.getUint8(i);
     while (first & HIGH_1) {
         bytes++;
         first = first << 1;
     }
-    code = first >>> bytes;
+    value = (first & 0xff) >>> bytes;
     for (let b = 1; b < bytes; b++) {
         const byte = view.getUint8(i + b);
         if ((byte & 0b11000000) !== HIGH_1)
-            validate_1.fail(`Byte at index ${i + b} is not part of a valid UTF-8 character.`);
-        code = (code << 6) | (byte & 0b00111111);
+            validate_1.fail(`Byte at index ${i + b} is not part of a valid UTF-8 sequence.`);
+        value = (value << 6) | (byte & 0b00111111);
     }
-    codes.push(code);
+    codes.push(value);
     return Math.max(1, bytes);
 }

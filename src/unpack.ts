@@ -128,6 +128,12 @@ function unpackValue(field: Field, view: DataView, i: number): [any, number] {
       return [view.getInt16(i), 2];
     case 'int32':
       return [view.getInt32(i), 4];
+    case 'uint8':
+      return [view.getUint8(i), 1];
+    case 'uint16':
+      return [view.getUint16(i), 2];
+    case 'uint32':
+      return [view.getUint32(i), 4];
     case 'float':
       return [view.getFloat32(i), 4];
     case 'boolean':
@@ -136,6 +142,10 @@ function unpackValue(field: Field, view: DataView, i: number): [any, number] {
       return [field.enumOf[view.getInt8(i)], 1];
     case 'string':
       return unpackString(view, i);
+    case 'varint':
+      const drop = [];
+      const bytes = unpackVarInt(view, i, drop);
+      return [drop[0], bytes];
   }
 }
 
@@ -143,15 +153,15 @@ function unpackString(view: DataView, i0: number): [string, number] {
   const codes = [];
   let i = i0;
   while (view.getUint8(i) !== 0) {
-    i += unpackChar(view, i, codes);
+    i += unpackVarInt(view, i, codes);
     if (i === i0) break;
   }
 
   return [String.fromCharCode(...codes), i - i0 + 1];
 }
 
-function unpackChar(view: DataView, i: number, codes: number[]): number {
-  let code = 0;
+function unpackVarInt(view: DataView, i: number, codes: number[]): number {
+  let value = 0;
   let bytes = 0;
 
   let first = view.getUint8(i);
@@ -159,16 +169,16 @@ function unpackChar(view: DataView, i: number, codes: number[]): number {
     bytes++;
     first = first << 1;
   }
-  code = first >>> bytes;
+  value = (first & 0xff) >>> bytes;
 
   for (let b = 1; b < bytes; b++) {
     const byte = view.getUint8(i + b);
     if ((byte & 0b11000000) !== HIGH_1)
-      fail(`Byte at index ${i + b} is not part of a valid UTF-8 character.`);
+      fail(`Byte at index ${i + b} is not part of a valid UTF-8 sequence.`);
 
-    code = (code << 6) | (byte & 0b00111111);
+    value = (value << 6) | (byte & 0b00111111);
   }
-  codes.push(code);
 
+  codes.push(value);
   return Math.max(1, bytes);
 }

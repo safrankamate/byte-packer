@@ -6,13 +6,17 @@ export declare type Field = {
     name: string;
     nullable?: boolean;
 } & TypeDef;
-export declare type FieldType = SimpleType | EnumType;
-export declare type SimpleType = 'int8' | 'int16' | 'int32' | 'float' | 'boolean' | 'string';
-export declare type EnumType = 'enum';
-export declare type TypeDef = {
-    type: SimpleType;
-} | {
-    type: EnumType;
+declare type TypeName = SimpleName | EnumName;
+declare type TypeDef = SimpleType | EnumType;
+declare type SimpleName = 'int8' | 'int16' | 'int32' | 'uint8' | 'uint16' | 'uint32' | 'varint' | 'float' | 'boolean' | 'string';
+declare type SimpleType = {
+    type: SimpleName;
+};
+declare type EnumName = 'enum';
+declare type EnumType = {
+    type: EnumName;
     enumOf: string[];
 };
-export declare const Types: Record<string, FieldType>;
+export declare const Types: Record<string, TypeName>;
+export declare const TypeCodes: TypeName[];
+export {};

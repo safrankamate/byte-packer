@@ -48,6 +48,14 @@ module.exports = function() {
   );
 
   run(
+    'varInt',
+    [{ value: 1 }, { value: 200 }, { value: 3000 }, { value: 400000 }],
+    {
+      fields: [{ name: 'value', type: 'varint' }],
+    },
+  );
+
+  run(
     'enum',
     [{ value: 'one' }, { value: 'two' }, { value: 'three' }, { value: 'two' }],
     {
@@ -66,6 +74,7 @@ module.exports = function() {
       { value: 'a' },
       { value: 'abc' },
       { value: 'Mate Safranka' },
+      { value: 'árvíztűrő tükörfúrógép' },
     ],
     {
       fields: [{ name: 'value', type: 'string' }],
