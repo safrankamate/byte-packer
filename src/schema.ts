@@ -8,8 +8,8 @@ export type Field = {
   nullable?: boolean;
 } & TypeDef;
 
-type TypeName = SimpleName | EnumName;
-type TypeDef = SimpleType | EnumType;
+type TypeName = SimpleName | EnumName | DateName;
+type TypeDef = SimpleType | EnumType | DateType;
 
 type SimpleName =
   | 'int8'
@@ -22,16 +22,21 @@ type SimpleName =
   | 'float'
   | 'boolean'
   | 'string';
-
 type SimpleType = {
   type: SimpleName;
 };
 
 type EnumName = 'enum';
-
 type EnumType = {
   type: EnumName;
   enumOf: string[];
+};
+
+type DateName = 'date';
+type DatePrecision = 'day' | 'minute' | 'second' | 'ms';
+type DateType = {
+  type: DateName;
+  precision?: DatePrecision;
 };
 
 export const Types: Record<string, TypeName> = {
@@ -46,6 +51,7 @@ export const Types: Record<string, TypeName> = {
   Boolean: 'boolean',
   String: 'string',
   Enum: 'enum',
+  Date: 'date',
 };
 
 export const TypeCodes: TypeName[] = [
@@ -61,4 +67,13 @@ export const TypeCodes: TypeName[] = [
   'uint8',
   'uint16',
   'uint32',
+  'date',
+];
+
+export const DatePrecisions: DatePrecision[] = [
+  undefined,
+  'day',
+  'minute',
+  'second',
+  'ms',
 ];

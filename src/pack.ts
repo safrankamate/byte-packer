@@ -1,4 +1,4 @@
-import { Schema, Field, TypeCodes } from './schema';
+import { Schema, Field, TypeCodes, DatePrecisions } from './schema';
 import { validatePack, validateValue } from './validate';
 
 interface SchemaPlus extends Schema {
@@ -107,6 +107,9 @@ function packField(field: Field, view: DataView, i0: number): number {
     for (const value of field.enumOf) {
       i += packString(value, view, i);
     }
+  } else if (field.type === 'date') {
+    view.setUint8(i, DatePrecisions.indexOf(field.precision));
+    i++;
   }
   return i - i0;
 }
@@ -184,6 +187,8 @@ function packValue(
       return 1;
     case 'string':
       return packString(value, view, i);
+    case 'date':
+      return packDate(value, DatePrecisions.indexOf(field.precision), view, i);
   }
 
   return 0;
@@ -230,4 +235,39 @@ function packVarInt(value: number, view: DataView, i: number): number {
     }
     return 4;
   }
+}
+
+function packDate(
+  value: Date,
+  precIndex: number,
+  view?: DataView,
+  i0?: number,
+): number {
+  let bytes = 4;
+  if (view) {
+    view.setInt16(i0, value.getUTCFullYear());
+    view.setInt8(i0 + 2, value.getUTCMonth());
+    view.setInt8(i0 + 3, value.getUTCDate());
+  }
+
+  if (precIndex > 1) {
+    bytes += 2;
+    if (view) {
+      view.setInt8(i0 + 4, value.getUTCHours());
+      view.setInt8(i0 + 5, value.getUTCMinutes());
+    }
+  }
+  if (precIndex > 2) {
+    bytes += 1;
+    if (view) {
+      view.setInt8(i0 + 6, value.getUTCSeconds());
+    }
+  }
+  if (precIndex > 3) {
+    bytes += 2;
+    if (view) {
+      view.setInt16(i0 + 7, value.getUTCMilliseconds());
+    }
+  }
+  return bytes;
 }
