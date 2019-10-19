@@ -8,27 +8,23 @@ export type Field = {
   nullable?: boolean;
 } & TypeDef;
 
-export type FieldType = SimpleType | EnumType;
+type TypeName = SimpleName | EnumName;
+type TypeDef = SimpleType | EnumType;
 
-export type SimpleType =
-  | 'int8'
-  | 'int16'
-  | 'int32'
-  | 'float'
-  | 'boolean'
-  | 'string';
-export type EnumType = 'enum';
+type SimpleName = 'int8' | 'int16' | 'int32' | 'float' | 'boolean' | 'string';
 
-export type TypeDef =
-  | {
-      type: SimpleType;
-    }
-  | {
-      type: EnumType;
-      enumOf: string[];
-    };
+type SimpleType = {
+  type: SimpleName;
+};
 
-export const Types: Record<string, FieldType> = {
+type EnumName = 'enum';
+
+type EnumType = {
+  type: EnumName;
+  enumOf: string[];
+};
+
+export const Types: Record<string, TypeName> = {
   Int8: 'int8',
   Int16: 'int16',
   Int32: 'int32',
@@ -37,3 +33,14 @@ export const Types: Record<string, FieldType> = {
   String: 'string',
   Enum: 'enum',
 };
+
+export const TypeCodes: TypeName[] = [
+  undefined,
+  'int8',
+  'int16',
+  'int32',
+  'float',
+  'boolean',
+  'string',
+  'enum',
+];

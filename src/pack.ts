@@ -1,4 +1,4 @@
-import { Schema, Field, FieldType } from './schema';
+import { Schema, Field, TypeCodes } from './schema';
 import { validatePack, validateValue } from './validate';
 
 interface SchemaPlus extends Schema {
@@ -75,16 +75,6 @@ function measureValue(field: Field, value: any): number {
 
 // Packing
 
-const TypeCodes: Record<FieldType, number> = {
-  'int8': 1,
-  'int16': 2,
-  'int32': 3,
-  'float': 4,
-  'boolean': 5,
-  'string': 6,
-  'enum': 7,
-};
-
 const HIGH_1 = 0b10000000;
 
 function packSchema(fields: Field[], view: DataView, i0: number): number {
@@ -102,7 +92,10 @@ function packSchema(fields: Field[], view: DataView, i0: number): number {
 }
 
 function packField(field: Field, view: DataView, i0: number): number {
-  view.setUint8(i0, (field.nullable ? HIGH_1 : 0) | TypeCodes[field.type]);
+  view.setUint8(
+    i0,
+    (field.nullable ? HIGH_1 : 0) | TypeCodes.indexOf(field.type),
+  );
 
   let i = i0 + 1;
   i += packString(field.name, view, i);

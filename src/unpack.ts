@@ -1,4 +1,4 @@
-import { Schema, Field, FieldType } from './schema';
+import { Schema, Field, TypeCodes } from './schema';
 import { validateSchema, fail } from './validate';
 
 interface SchemaPlus extends Schema {
@@ -56,20 +56,9 @@ function unpackSchema(view: DataView, fields: Field[], i0: number): number {
   return i - i0;
 }
 
-const CodeTypes: FieldType[] = [
-  undefined,
-  'int8',
-  'int16',
-  'int32',
-  'float',
-  'boolean',
-  'string',
-  'enum',
-];
-
 function unpackField(view: DataView, fields: Field[], i0: number): number {
   const typeByte = view.getUint8(i0);
-  const type: FieldType = CodeTypes[typeByte & 0b00001111];
+  const type = TypeCodes[typeByte & 0b00001111];
   if (!type) fail(`Invalid type byte ${typeByte} as index ${i0}`);
 
   const nullable = !!(typeByte & HIGH_1);
