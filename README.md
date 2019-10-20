@@ -53,6 +53,8 @@ export const PersonSchema: Schema = {
 };
 ```
 
+You can find a full list of available field types in the [API Reference](#api-reference).
+
 ## 2. Pack the objects
 
 On the sender side, call `pack()` with the array of objects as the first argument, and the schema as the second:
@@ -167,10 +169,30 @@ _Note: If `unpack()` is called with a self-describing payload **and** a schema o
 
 # API Reference
 
+- [Field Types](#field-types)
 - [interface Schema](#interface-schema)
 - [type Field](#type-field)
 - [function pack()](#function-pack)
 - [function unpack()](#function-unpack)
+
+## **Field Types**
+
+| **name**  | **description**                                                                    |
+| --------- | ---------------------------------------------------------------------------------- |
+| `int8`    | Signed 8-bit integer (-128 .. 127)                                                 |
+| `uint8`   | Unsigned 8-bit integer (0 .. 255)                                                  |
+| `int16`   | Signed 16-bit integer (-32 768 .. 32 767)                                          |
+| `uint16`  | Unsigned 16-bit integer (0 .. 65 535)                                              |
+| `int32`   | Signed 32-bit integer (-2 147 483 648 .. 2 147 483 647)                            |
+| `uint32`  | Unsigned 32-bit integer (0 .. 4 294 967 295)                                       |
+| `varint`  | Variable-length unsigned integer (0 .. 1 112 063)                                  |
+| `float`   | 32-bit floating-point                                                              |
+| `boolean` | `true` or `false`                                                                  |
+| `string`  | String (encoded in UTF-8 with null terminator)                                     |
+| `enum`    | One of a predefined list of options, stored as an index [(see below)](#type-field) |
+| `date`    | Date, optionally with time [(see below)](#type-field)                              |
+
+The `varint` type is useful if you expect values to randomly fall anywhere within the allowed range, from single-digits to the hundreds of thousands. Storing them as variable-length instead of `uint32` can help you shave a few more bytes off the payload by using fewer bytes for lower values.
 
 ## **`interface Schema`**
 
@@ -189,7 +211,7 @@ Describes a schema used for packing and unpacking arrays of objects. BytePacker 
 type Field = {
   name: string;
   nullable?: boolean;
-} & (SimpleType | EnumType);
+} & (SimpleType | EnumType | DateType);
 
 type SimpleType = {
   type: 'int8' | 'int16' | 'int32' | 'float' | 'boolean' | 'string';
@@ -199,13 +221,19 @@ type EnumType = {
   type: 'enum';
   enumOf: string[];
 };
+
+type DateType = {
+  type: 'date';
+  precision?: 'day' | 'minute' | 'second' | 'ms';
+};
 ```
 
 Describes a field in the schema.
 
 - All fields must have a `name` and `type` specified.
 - The `nullable` flag is assumed to be `false` if omitted.
-- Fields with a type of `enum` must also have an `enumOf` property, which is an array of strings that contains all possible values of the field.
+- Fields with a type of `enum` _must_ also have an `enumOf` property, which is an array of strings that contains all possible values of the field.
+- Fields with a type of `date` _may_ also have a `precision` propety, which specifies whether time data should also be stored, and if yes, to what precision. If not specified, defaults to `day`. Less precision requires fewer bytes to store; time data that is not covered by the specified precision will be nondeterministic at unpacking.
 
 ## **`function pack()`**
 
@@ -247,31 +275,82 @@ If the payload is generated to be self-describing, the feature byte is followed 
 
 After the header size and field count, each field is described as follows:
 
-| **data**       |      **length** | **description**                                                                                                                                                                                                                                                                                                    |
-| -------------- | --------------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **field type** |              1B | The four least significant bits of this byte represent the field type: 1 = `int8`, 2 = `int16`, 3 = `int32`, 4 = `float`, 5 = `boolean`, 6 = `string`, 7 = `enum`. The most significant bit is 1 for nullable fields and 0 for non-nullables. Additional bits may be set to indicate other features in the future. |
-| **field name** | _(varies)_ + 1B | Field names (and all strings in general) are encoded in UTF-8 and followed by a null terminator (a byte value of 0).                                                                                                                                                                                               |
+| **data**       |      **length** | **description**                                                                                                                                                                                                        |
+| -------------- | --------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **field type** |              1B | The five least significant bits of this byte represent the field type. The most significant bit is 1 for nullable fields and 0 for non-nullables. Additional bits may be set to indicate other features in the future. |
+| **field name** | _(varies)_ + 1B | Field names (and all strings in general) are encoded in UTF-8 and followed by a null terminator (a byte value of 0).                                                                                                   |
 
-Fields with a type of `enum` have additional information following the type and name:
+The numeric codes for the field types are as follows:
+
+| **type**  | **code** |
+| --------- | -------: |
+| `int8`    |        1 |
+| `int16`   |        2 |
+| `int32`   |        3 |
+| `float`   |        4 |
+| `boolean` |        5 |
+| `string`  |        6 |
+| `enum`    |        7 |
+| `varint`  |        8 |
+| `uint8`   |        9 |
+| `uint16`  |       10 |
+| `uint32`  |       11 |
+| `date`    |       12 |
+
+Fields with the type `enum` have additional information following the type and name:
 
 | **data**              |                         **length** | **description**                                                      |
 | --------------------- | ---------------------------------: | -------------------------------------------------------------------- |
 | **enum option count** |                                 1B | The number of possible enum values (max. 255).                       |
 | **enum options**      | (_(varies)_ + 1B) x (option count) | Each enum option is listed as a UTF-8 string with a null terminator. |
 
+Fields with the type `date` must also specify the required precision with a numeric code after the type and name:
+
+| **precision** | **code** |
+| ------------: | -------: |
+|         `day` |        1 |
+|      `minute` |        2 |
+|      `second` |        3 |
+|          `ms` |        4 |
+
 ## Object definitions
 
 The feature byte and optional header are followed immediately by the object definitions. These chunks contain the raw data of the packed objects' fields, in the same order as listed in the schema.
 
-| **field type** | **value length** | **description**                                                                             |
-| -------------- | ---------------: | ------------------------------------------------------------------------------------------- |
-| `int8`         |               1B | 8-bit integer value                                                                         |
-| `int16`        |               2B | 16-bit integer value                                                                        |
-| `int32`        |               4B | 32-bit integer value                                                                        |
-| `float`        |               4B | 32-bit floating point value                                                                 |
-| `boolean`      |               1B | 1 for `true`, 0 for `false`                                                                 |
-| `string`       |  _(varies)_ + 1B | UTF-8 encoded string with null terminator                                                   |
-| `enum`         |               1B | Index of the value within the array of options listed in the `enumOf` property of the field |
+| **field type**     | **value length** | **note**                                                                                    |
+| ------------------ | ---------------: | ------------------------------------------------------------------------------------------- |
+| `int8` / `uint8`   |               1B |
+| `int16` / `uint16` |               2B |
+| `int32` / `uint32` |               4B |
+| `float`            |               4B |
+| `boolean`          |               1B |
+| `string`           |  _(varies)_ + 1B | Encoded in UTF-8 + null terminator                                                          |
+| `enum`             |               1B | Index of the value within the array of options listed in the `enumOf` property of the field |
+| `varint`           |       _(varies)_ | (See below)                                                                                 |
+| `date`             |       _(varies)_ | (See below)                                                                                 |
+
+The length of a `varint` value depends on the value itself. These values are encoded the same way as UTF-8 characters.
+
+|        **value** | **value length** |
+| ---------------: | ---------------: |
+|         0 .. 127 |               1B |
+|      128 .. 2047 |               2B |
+|    2048 .. 65535 |               3B |
+| 65536 .. 1112064 |               4B |
+
+The length and data of `date` values depends on the precision:
+
+| **value** | **value length** | **description** | **precision**            |
+| --------: | ---------------: | --------------- | ------------------------ |
+|   0..9999 |               2B | Year            | _all_                    |
+|     0..11 |               1B | Month           | _all_                    |
+|     1..31 |               1B | Day             | _all_                    |
+|     0..23 |               1B | Hours           | `minute`, `second`, `ms` |
+|     0..59 |               1B | Minutes         | `minute`, `second`, `ms` |
+|     0..59 |               1B | Seconds         | `second`, `ms`           |
+|    0..999 |               2B | Milliseconds    | `ms`                     |
+
+Thus, the `day` precision requires 4 bytes (2B year + 1B month + 1B day), the `minute` precision requires 6 bytes (`day` precision + 1B hours + 1B minutes), and so on.
 
 ### Null bytes
 
@@ -325,42 +404,7 @@ The following sections describe potential improvements to the library. Feel free
 
 ## Tests
 
-Currently, tests are written in plain NodeJS, and only serve to test basic functionality. A more thorough suite of tests would be desirable, adhering to the following requirements:
-
-- It should be written in one of the popular testing frameworks.
-- It should cover nontrivial and edge cases.
-- It should cover error handling.
-
-## Field type `date`
-
-```typescript
-type DateType = {
-  type: 'date';
-  precision?: 'day' | 'minute' | 'second' | 'ms';
-};
-```
-
-Allow fields to contain date or date-time values as `Date` objects. The optional `precision` property should default to `day` if not specified.
-
-In a self-describing header, the name of a date field should be followed by a single byte value indicating its precision: 1 = `day`, 2 = `minute`, 3 = `second`, 4 = `ms`.
-
-In the payload, date values should be encoded depending on the specified precision:
-
-| **value** | **bytes** | **description** | **precision**            |
-| --------: | --------: | --------------- | ------------------------ |
-|   0..9999 |        2B | Year            | _all_                    |
-|     0..11 |        1B | Month           | _all_                    |
-|     1..31 |        1B | Day             | _all_                    |
-|     0..23 |        1B | Hours           | `minute`, `second`, `ms` |
-|     0..59 |        1B | Minutes         | `minute`, `second`, `ms` |
-|     0..59 |        1B | Seconds         | `second`, `ms`           |
-|    0..999 |        2B | Milliseconds    | `ms`                     |
-
-During unpacking, these sequences should be parsed back into `Date` objects.
-
-Error handling:
-
-- During unpacking, assert that all values are in their allowed ranges.
+Currently, tests are written in plain NodeJS, and only serve to test basic functionality. A more thorough suite of tests in one of the more professional testing frameworks would be desirable.
 
 ## Field type `array`
 
