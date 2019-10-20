@@ -6,10 +6,12 @@ module.exports = function() {
 
   const { schema, input, expected } = build();
   console.log('* with schema');
-  run(input, expected, schema);
+  const schemaOk = run(input, expected, schema);
 
   console.log('* self-describing');
-  run(input, expected, { ...schema, selfDescribing: true });
+  const selfOk = run(input, expected, { ...schema, selfDescribing: true });
+
+  return schemaOk && selfOk;
 };
 
 const DateLengths = {
@@ -22,6 +24,7 @@ const DateLengths = {
 function run(input, expected, schema) {
   const buffer = pack(input, schema);
   const [result] = unpack(buffer, schema);
+  let ok = true;
   for (const key in result) {
     const resultDate = result[key].toISOString().slice(0, DateLengths[key]);
     const expectedDate = expected[key];
@@ -30,8 +33,10 @@ function run(input, expected, schema) {
       console.error(
         `expected ${expectedDate.toString()}, got ${resultDate.toString()}`,
       );
+      ok = false;
     }
   }
+  return ok;
 }
 
 function build() {

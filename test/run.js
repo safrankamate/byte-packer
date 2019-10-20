@@ -4,16 +4,18 @@ const { unpack } = require('../dist/unpack');
 module.exports = function run(name, input, schema) {
   console.log('\nCase', name);
   console.log('* with schema');
-  runWithSchema(input, schema);
+  const schemaOk = runWithSchema(input, schema);
 
   console.log('* self-describing');
-  runSelfDescribing(input, schema);
+  const selfOk = runSelfDescribing(input, schema);
+
+  return schemaOk && selfOk;
 };
 
 function runWithSchema(input, schema) {
   const buffer = pack(input, schema);
   const result = unpack(buffer, schema);
-  compare(input, result);
+  return compare(input, result);
 }
 
 function runSelfDescribing(input, schema) {
@@ -22,10 +24,11 @@ function runSelfDescribing(input, schema) {
     selfDescribing: true,
   });
   const result = unpack(buffer);
-  compare(input, result);
+  return compare(input, result);
 }
 
 function compare(input, result) {
+  const ok = true;
   for (let i = 0; i < input.length; i++) {
     let hasError = false;
     for (const key in input[i]) {
@@ -45,6 +48,9 @@ function compare(input, result) {
       console.log('  Compare:');
       console.log('    ', JSON.stringify(input[i]));
       console.log('    ', JSON.stringify(result[i]));
+      ok = false;
     }
   }
+
+  return ok;
 }
