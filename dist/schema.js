@@ -12,6 +12,7 @@ exports.Types = {
     Boolean: 'boolean',
     String: 'string',
     Enum: 'enum',
+    Date: 'date',
 };
 exports.TypeCodes = [
     undefined,
@@ -26,4 +27,12 @@ exports.TypeCodes = [
     'uint8',
     'uint16',
     'uint32',
+    'date',
+];
+exports.DatePrecisions = [
+    undefined,
+    'day',
+    'minute',
+    'second',
+    'ms',
 ];

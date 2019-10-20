@@ -33,10 +33,15 @@ function countNullables(fields) {
     return Math.ceil(fields.reduce((counter, field) => counter + Number(field.nullable || false), 0) / 8);
 }
 function measureField(field) {
-    return (1 +
-        packString(field.name) +
-        (field.type === 'enum' &&
-            1 + field.enumOf.reduce((total, value) => total + packString(value), 0)));
+    let bytes = 1 + packString(field.name);
+    if (field.type === 'enum') {
+        bytes +=
+            1 + field.enumOf.reduce((total, value) => total + packString(value), 0);
+    }
+    else if (field.type === 'date') {
+        bytes += 1;
+    }
+    return bytes;
 }
 function measureRow(fields, row) {
     return fields.reduce((total, field) => total + measureValue(field, row[field.name]), 0);
@@ -70,6 +75,10 @@ function packField(field, view, i0) {
         for (const value of field.enumOf) {
             i += packString(value, view, i);
         }
+    }
+    else if (field.type === 'date') {
+        view.setUint8(i, schema_1.DatePrecisions.indexOf(field.precision));
+        i++;
     }
     return i - i0;
 }
@@ -131,6 +140,8 @@ function packValue(field, value, view, i) {
             return 1;
         case 'string':
             return packString(value, view, i);
+        case 'date':
+            return packDate(value, schema_1.DatePrecisions.indexOf(field.precision), view, i);
     }
     return 0;
 }
@@ -177,4 +188,32 @@ function packVarInt(value, view, i) {
         }
         return 4;
     }
+}
+function packDate(value, precIndex, view, i0) {
+    let bytes = 4;
+    if (view) {
+        view.setUint16(i0, value.getUTCFullYear());
+        view.setUint8(i0 + 2, value.getUTCMonth());
+        view.setUint8(i0 + 3, value.getUTCDate());
+    }
+    if (precIndex > 1) {
+        bytes += 2;
+        if (view) {
+            view.setUint8(i0 + 4, value.getUTCHours());
+            view.setUint8(i0 + 5, value.getUTCMinutes());
+        }
+    }
+    if (precIndex > 2) {
+        bytes += 1;
+        if (view) {
+            view.setUint8(i0 + 6, value.getUTCSeconds());
+        }
+    }
+    if (precIndex > 3) {
+        bytes += 2;
+        if (view) {
+            view.setUint16(i0 + 7, value.getUTCMilliseconds());
+        }
+    }
+    return bytes;
 }

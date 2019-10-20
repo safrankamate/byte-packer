@@ -62,6 +62,9 @@ function unpackField(view, fields, i0) {
             i += optionLength;
         }
     }
+    else if (field.type === 'date') {
+        field.precision = schema_1.DatePrecisions[view.getUint8(i++)];
+    }
     fields.push(field);
     return i - i0;
 }
@@ -114,6 +117,8 @@ function unpackValue(field, view, i) {
             const drop = [];
             const bytes = unpackVarInt(view, i, drop);
             return [drop[0], bytes];
+        case 'date':
+            return unpackDate(view, i, schema_1.DatePrecisions.indexOf(field.precision));
     }
 }
 function unpackString(view, i0) {
@@ -143,4 +148,29 @@ function unpackVarInt(view, i, codes) {
     }
     codes.push(value);
     return Math.max(1, bytes);
+}
+function unpackDate(view, i0, precIndex) {
+    const value = new Date();
+    value.setUTCHours(0);
+    value.setUTCMinutes(0);
+    value.setUTCSeconds(0);
+    value.setUTCMilliseconds(0);
+    let bytes = 4;
+    value.setUTCFullYear(view.getInt16(i0));
+    value.setUTCMonth(view.getInt8(i0 + 2));
+    value.setUTCDate(view.getInt8(i0 + 3));
+    if (precIndex > 1) {
+        bytes += 2;
+        value.setUTCHours(view.getInt8(i0 + 4));
+        value.setUTCMinutes(view.getInt8(i0 + 5));
+    }
+    if (precIndex > 2) {
+        bytes += 1;
+        value.setUTCSeconds(view.getInt8(i0 + 6));
+    }
+    if (precIndex > 3) {
+        bytes += 2;
+        value.setUTCMilliseconds(view.getInt16(i0 + 7));
+    }
+    return [value, bytes];
 }
