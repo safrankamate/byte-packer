@@ -192,7 +192,11 @@ function unpackDate(
   i0: number,
   precIndex: number,
 ): [Date, number] {
-  const value = new Date(2000, 0, 1, 0, 0, 0, 0);
+  const value = new Date();
+  value.setUTCHours(0);
+  value.setUTCMinutes(0);
+  value.setUTCSeconds(0);
+  value.setUTCMilliseconds(0);
 
   let bytes = 4;
   value.setUTCFullYear(view.getInt16(i0));

@@ -53,12 +53,14 @@ function countNullables(fields: Field[]): number {
 }
 
 function measureField(field: Field): number {
-  return (
-    1 +
-    packString(field.name) +
-    (field.type === 'enum' &&
-      1 + field.enumOf.reduce((total, value) => total + packString(value), 0))
-  );
+  let bytes = 1 + packString(field.name);
+  if (field.type === 'enum') {
+    bytes +=
+      1 + field.enumOf.reduce((total, value) => total + packString(value), 0);
+  } else if (field.type === 'date') {
+    bytes += 1;
+  }
+  return bytes;
 }
 
 function measureRow(fields: Field[], row: any): number {
@@ -245,28 +247,28 @@ function packDate(
 ): number {
   let bytes = 4;
   if (view) {
-    view.setInt16(i0, value.getUTCFullYear());
-    view.setInt8(i0 + 2, value.getUTCMonth());
-    view.setInt8(i0 + 3, value.getUTCDate());
+    view.setUint16(i0, value.getUTCFullYear());
+    view.setUint8(i0 + 2, value.getUTCMonth());
+    view.setUint8(i0 + 3, value.getUTCDate());
   }
 
   if (precIndex > 1) {
     bytes += 2;
     if (view) {
-      view.setInt8(i0 + 4, value.getUTCHours());
-      view.setInt8(i0 + 5, value.getUTCMinutes());
+      view.setUint8(i0 + 4, value.getUTCHours());
+      view.setUint8(i0 + 5, value.getUTCMinutes());
     }
   }
   if (precIndex > 2) {
     bytes += 1;
     if (view) {
-      view.setInt8(i0 + 6, value.getUTCSeconds());
+      view.setUint8(i0 + 6, value.getUTCSeconds());
     }
   }
   if (precIndex > 3) {
     bytes += 2;
     if (view) {
-      view.setInt16(i0 + 7, value.getUTCMilliseconds());
+      view.setUint16(i0 + 7, value.getUTCMilliseconds());
     }
   }
   return bytes;
