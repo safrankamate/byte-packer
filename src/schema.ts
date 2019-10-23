@@ -8,8 +8,8 @@ export type Field = {
   nullable?: boolean;
 } & TypeDef;
 
-type TypeName = SimpleName | EnumName | DateName;
-type TypeDef = SimpleType | EnumType | DateType;
+type TypeName = SimpleName | EnumName | DateName | ArrayName;
+type TypeDef = SimpleType | EnumType | DateType | ArrayType;
 
 type SimpleName =
   | 'int8'
@@ -39,6 +39,13 @@ type DateType = {
   precision?: DatePrecision;
 };
 
+type ArrayName = 'array';
+type ArrayType = {
+  type: ArrayName;
+  itemsNullable?: boolean;
+  arrayOf: SimpleType | EnumType | DateType | ArrayType;
+};
+
 export const Types: Record<string, TypeName> = {
   Int8: 'int8',
   UInt8: 'uint8',
@@ -52,6 +59,7 @@ export const Types: Record<string, TypeName> = {
   String: 'string',
   Enum: 'enum',
   Date: 'date',
+  Array: 'array',
 };
 
 export const TypeCodes: TypeName[] = [
@@ -68,6 +76,7 @@ export const TypeCodes: TypeName[] = [
   'uint16',
   'uint32',
   'date',
+  'array',
 ];
 
 export const DatePrecisions: DatePrecision[] = [

@@ -47,6 +47,26 @@ module.exports = function() {
     runForError('Unlisted value in enum field', [{ foo: 'invalid' }], {
       fields: [{ name: 'foo', type: 'enum', enumOf: ['bar', 'baz'] }],
     }),
+
+    runForError('No arrayOf in array field', [{}], {
+      fields: [{ name: 'foo', type: 'array' }],
+    }),
+    runForError('Invalid arrayOf in array field', [{}], {
+      fields: [{ name: 'foo', type: 'array', arrayOf: 'invalid' }],
+    }),
+    runForError('Invalid type definition in array field', [{}], {
+      fields: [{ name: 'foo', type: 'array', arrayOf: { type: 'enum' } }],
+    }),
+    runForError('Invalid type definition in nested array field', [{}], {
+      fields: [{
+        name: 'foo',
+        type: 'array',
+        arrayOf: {
+          type: 'array',
+          arrayOf: { type: 'enum' },
+        },
+      }],
+    }),
   ];
 
   return results.every(Boolean);

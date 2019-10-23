@@ -36,13 +36,15 @@ export function validateValue(value: any, field: Field) {
 // Schema validation
 
 type EnumDetails = { enumOf: string[] };
+type ArrayDetails = { arrayOf: any };
 
 const rejectField = ({ name, type, ...field }: Field, names: Set<string>) =>
   (!name && 'Fields must have a name property.') ||
   (!type && `Field ${name} has no type specified.`) ||
   (names.has(name) && `Duplicate field name in schema: ${name}`) ||
   (!FieldTypes.has(type) && `Field ${name} has invalid type ${type}`) ||
-  (type === 'enum' && rejectEnum(name, (field as EnumDetails).enumOf));
+  (type === 'enum' && rejectEnum(name, (field as EnumDetails).enumOf)) ||
+  (type === 'array' && rejectArray(name, (field as ArrayDetails).arrayOf));
 
 const rejectEnum = (name: string, enumOf: string[]) =>
   (!Array.isArray(enumOf) &&
@@ -52,6 +54,11 @@ const rejectEnum = (name: string, enumOf: string[]) =>
     `Field ${name} contains invalid enum options`) ||
   (new Set(enumOf).size !== enumOf.length &&
     `Field ${name} must contain unique enum options.`);
+
+const rejectArray = (name: string, arrayOf: any) => (
+  (typeof arrayOf !== 'object' && `Field ${name} must have a valid arrayOf property`) ||
+  rejectField({ name: `${name}'s type definition`, ...arrayOf }, new Set())
+);
 
 // Input validation
 
