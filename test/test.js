@@ -1,4 +1,4 @@
-const ALL_SUITES = ['trivial', 'dates', 'complex', 'errors'];
+const ALL_SUITES = ['trivial', 'dates', 'arrays', 'complex', 'errors'];
 
 const suites = process.argv.slice(2);
 const toRun =

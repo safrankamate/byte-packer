@@ -1,10 +1,10 @@
 const { pack } = require('../dist/pack');
 const { unpack } = require('../dist/unpack');
 
-module.exports = function run(name, input, schema) {
+module.exports = function run(name, input, schema, check = compare) {
   console.log('\nCase', name);
   console.log('* with schema');
-  const schemaOk = runWithSchema(input, schema);
+  const schemaOk = runWithSchema(input, schema, check);
 
   console.log('* self-describing');
   const selfOk = runSelfDescribing(input, schema);
@@ -12,19 +12,19 @@ module.exports = function run(name, input, schema) {
   return schemaOk && selfOk;
 };
 
-function runWithSchema(input, schema) {
+function runWithSchema(input, schema, check) {
   const buffer = pack(input, schema);
   const result = unpack(buffer, schema);
-  return compare(input, result);
+  return check(input, result);
 }
 
-function runSelfDescribing(input, schema) {
+function runSelfDescribing(input, schema, check) {
   const buffer = pack(input, {
     ...schema,
     selfDescribing: true,
   });
   const result = unpack(buffer);
-  return compare(input, result);
+  return check(input, result);
 }
 
 function compare(input, result) {
