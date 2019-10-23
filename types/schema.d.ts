@@ -6,8 +6,8 @@ export declare type Field = {
     name: string;
     nullable?: boolean;
 } & TypeDef;
-declare type TypeName = SimpleName | EnumName | DateName;
-declare type TypeDef = SimpleType | EnumType | DateType;
+declare type TypeName = SimpleName | EnumName | DateName | ArrayName;
+declare type TypeDef = SimpleType | EnumType | DateType | ArrayType;
 declare type SimpleName = 'int8' | 'int16' | 'int32' | 'uint8' | 'uint16' | 'uint32' | 'varint' | 'float' | 'boolean' | 'string';
 declare type SimpleType = {
     type: SimpleName;
@@ -22,6 +22,13 @@ declare type DatePrecision = 'day' | 'minute' | 'second' | 'ms';
 declare type DateType = {
     type: DateName;
     precision?: DatePrecision;
+};
+declare type ArrayName = 'array';
+declare type ArrayType = {
+    type: ArrayName;
+    arrayOf: {
+        nullable?: boolean;
+    } & (SimpleType | EnumType | DateType | ArrayType);
 };
 export declare const Types: Record<string, TypeName>;
 export declare const TypeCodes: TypeName[];

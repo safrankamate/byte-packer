@@ -13,6 +13,7 @@ exports.Types = {
     String: 'string',
     Enum: 'enum',
     Date: 'date',
+    Array: 'array',
 };
 exports.TypeCodes = [
     undefined,
@@ -28,6 +29,7 @@ exports.TypeCodes = [
     'uint16',
     'uint32',
     'date',
+    'array',
 ];
 exports.DatePrecisions = [
     undefined,

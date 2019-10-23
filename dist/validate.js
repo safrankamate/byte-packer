@@ -39,7 +39,8 @@ const rejectField = ({ name, type, ...field }, names) => (!name && 'Fields must 
     (!type && `Field ${name} has no type specified.`) ||
     (names.has(name) && `Duplicate field name in schema: ${name}`) ||
     (!FieldTypes.has(type) && `Field ${name} has invalid type ${type}`) ||
-    (type === 'enum' && rejectEnum(name, field.enumOf));
+    (type === 'enum' && rejectEnum(name, field.enumOf)) ||
+    (type === 'array' && rejectArray(name, field.arrayOf));
 const rejectEnum = (name, enumOf) => (!Array.isArray(enumOf) &&
     `Field ${name} has enum type but no enumOf property`) ||
     (enumOf.length === 1 && `Field ${name} has empty array for enumOf`) ||
@@ -47,6 +48,8 @@ const rejectEnum = (name, enumOf) => (!Array.isArray(enumOf) &&
         `Field ${name} contains invalid enum options`) ||
     (new Set(enumOf).size !== enumOf.length &&
         `Field ${name} must contain unique enum options.`);
+const rejectArray = (name, arrayOf) => ((typeof arrayOf !== 'object' && `Field ${name} must have a valid arrayOf property`) ||
+    rejectField({ name: `${name}'s type definition`, ...arrayOf }, new Set()));
 // Input validation
 const rejectNull = (value, { nullable }) => !nullable &&
     (value === null || value === undefined) &&

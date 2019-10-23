@@ -41,6 +41,9 @@ function measureField(field) {
     else if (field.type === 'date') {
         bytes += 1;
     }
+    else if (field.type === 'array') {
+        bytes += measureField({ ...field.arrayOf, name: '' });
+    }
     return bytes;
 }
 function measureRow(fields, row) {
@@ -79,6 +82,9 @@ function packField(field, view, i0) {
     else if (field.type === 'date') {
         view.setUint8(i, schema_1.DatePrecisions.indexOf(field.precision));
         i++;
+    }
+    else if (field.type === 'array') {
+        i += packField({ ...field.arrayOf, name: '' }, view, i);
     }
     return i - i0;
 }
@@ -142,6 +148,8 @@ function packValue(field, value, view, i) {
             return packString(value, view, i);
         case 'date':
             return packDate(value, schema_1.DatePrecisions.indexOf(field.precision), view, i);
+        case 'array':
+            return packArray(value, field, view, i);
     }
     return 0;
 }
@@ -216,4 +224,31 @@ function packDate(value, precIndex, view, i0) {
         }
     }
     return bytes;
+}
+function packArray(values, type, view, i0) {
+    let i = i0 || 0;
+    i += packVarInt(values.length, view, i0);
+    if (type.arrayOf.nullable) {
+        const nullBytes = Math.ceil(values.length / 8);
+        if (view) {
+            let nullFlags = 0;
+            for (let j = 0; j < values.length; j++) {
+                if (values[j] === null) {
+                    nullFlags |= 1 << j;
+                }
+            }
+            for (let j = 0; j < nullBytes; j++) {
+                view.setUint8(i + (nullBytes - j - 1), (nullFlags >>> (j * 8)) & 0xff);
+            }
+        }
+        i += nullBytes;
+    }
+    const valueType = {
+        ...type.arrayOf,
+        name: type.name,
+    };
+    for (const value of values) {
+        i += packValue(valueType, value, view, i);
+    }
+    return i - (i0 || 0);
 }
