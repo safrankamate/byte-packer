@@ -191,6 +191,8 @@ function packValue(
       return packString(value, view, i);
     case 'date':
       return packDate(value, DatePrecisions.indexOf(field.precision), view, i);
+    case 'array':
+      return packArray(value, field, view, i);
   }
 
   return 0;
@@ -272,4 +274,36 @@ function packDate(
     }
   }
   return bytes;
+}
+
+function packArray(values: any[], field: any, view?: DataView, i0?: number) {
+  let i = i0 || 0;
+  i += packVarInt(values.length, view, i0);
+
+  if (field.itemsNullable) {
+    const nullBytes = Math.ceil(values.length / 8);
+    if (view) {
+      let nullFlags = 0;
+      for (let j = 0; j < values.length; j++) {
+        if (values[j] === null) {
+          nullFlags |= 1 << j;
+        }
+      }
+      for (let j = 0; j < nullBytes; j++) {
+        view.setUint8(i + (nullBytes - j - 1), (nullFlags >>> (j * 8)) & 0xff);
+      }
+    }
+    i += nullBytes;
+  }
+
+  const valueType = {
+    ...field.arrayOf,
+    name: field.name,
+    nullable: field.itemsNullable,
+  };
+  for (const value of values) {
+    i += packValue(valueType, value, view, i);
+  }
+
+  return i - (i0 || 0);
 }
