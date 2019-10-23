@@ -42,9 +42,9 @@ const schema = {
     {
       name: 'nullable',
       type: 'array',
-      itemsNullable: true,
       arrayOf: {
         type: 'uint8',
+        nullable: true,
       },
     },
   ],

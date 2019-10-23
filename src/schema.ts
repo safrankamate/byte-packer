@@ -42,8 +42,9 @@ type DateType = {
 type ArrayName = 'array';
 type ArrayType = {
   type: ArrayName;
-  itemsNullable?: boolean;
-  arrayOf: SimpleType | EnumType | DateType | ArrayType;
+  arrayOf: {
+    nullable?: boolean;
+  } & (SimpleType | EnumType | DateType | ArrayType);
 };
 
 export const Types: Record<string, TypeName> = {

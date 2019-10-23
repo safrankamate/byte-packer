@@ -54,11 +54,14 @@ function countNullables(fields: Field[]): number {
 
 function measureField(field: Field): number {
   let bytes = 1 + packString(field.name);
+
   if (field.type === 'enum') {
     bytes +=
       1 + field.enumOf.reduce((total, value) => total + packString(value), 0);
   } else if (field.type === 'date') {
     bytes += 1;
+  } else if (field.type === 'array') {
+    bytes += measureField({ ...field.arrayOf, name: '' });
   }
   return bytes;
 }
@@ -102,6 +105,7 @@ function packField(field: Field, view: DataView, i0: number): number {
 
   let i = i0 + 1;
   i += packString(field.name, view, i);
+
   if (field.type === 'enum') {
     view.setUint8(i, field.enumOf.length);
 
@@ -112,6 +116,8 @@ function packField(field: Field, view: DataView, i0: number): number {
   } else if (field.type === 'date') {
     view.setUint8(i, DatePrecisions.indexOf(field.precision));
     i++;
+  } else if (field.type === 'array') {
+    i += packField({ ...field.arrayOf, name: '' }, view, i);
   }
   return i - i0;
 }
@@ -276,11 +282,11 @@ function packDate(
   return bytes;
 }
 
-function packArray(values: any[], field: any, view?: DataView, i0?: number) {
+function packArray(values: any[], type: any, view?: DataView, i0?: number) {
   let i = i0 || 0;
   i += packVarInt(values.length, view, i0);
 
-  if (field.itemsNullable) {
+  if (type.arrayOf.nullable) {
     const nullBytes = Math.ceil(values.length / 8);
     if (view) {
       let nullFlags = 0;
@@ -297,9 +303,8 @@ function packArray(values: any[], field: any, view?: DataView, i0?: number) {
   }
 
   const valueType = {
-    ...field.arrayOf,
-    name: field.name,
-    nullable: field.itemsNullable,
+    ...type.arrayOf,
+    name: type.name,
   };
   for (const value of values) {
     i += packValue(valueType, value, view, i);

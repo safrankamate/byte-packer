@@ -7,7 +7,7 @@ module.exports = function run(name, input, schema, check = compare) {
   const schemaOk = runWithSchema(input, schema, check);
 
   console.log('* self-describing');
-  const selfOk = runSelfDescribing(input, schema);
+  const selfOk = runSelfDescribing(input, schema, check);
 
   return schemaOk && selfOk;
 };

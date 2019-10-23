@@ -80,6 +80,13 @@ function unpackField(view: DataView, fields: Field[], i0: number): number {
     }
   } else if (field.type === 'date') {
     field.precision = DatePrecisions[view.getUint8(i++)];
+  } else if (field.type === 'array') {
+    const drop: Field[] = [];
+    i += unpackField(view, drop, i);
+
+    const [valueType] = drop;
+    delete valueType.name;
+    field.arrayOf = { ...valueType };
   }
 
   fields.push(field as Field);
@@ -229,7 +236,7 @@ function unpackArray(view: DataView, i0: number, field: any): [any[], number] {
   const [length] = drop;
 
   let nullFlags = 0;
-  if (field.itemsNullable) {
+  if (field.arrayOf.nullable) {
     const nullBytes = Math.ceil(length / 8);
     for (let j = 0; j < nullBytes; j++) {
       nullFlags = (nullFlags << 8) | view.getUint8(i + j);
