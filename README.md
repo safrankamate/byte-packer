@@ -14,6 +14,7 @@ Suppose you have an API that allows users to search a database of person records
   "firstName": "John",
   "lastName": "Doe",
   "sex": "male",
+  "hobbies": [ "riding", "painting" ]
 }
 ```
 
@@ -49,6 +50,13 @@ export const PersonSchema: Schema = {
       type: 'enum',
       enumOf: ['male', 'female', 'undisclosed'],
     },
+    {
+      name: 'hobbies',
+      type: 'array',
+      arrayOf: {
+        type: 'string',
+      },
+    },
   ],
 };
 ```
@@ -69,12 +77,14 @@ const persons = [
     firstName: 'John',
     lastName: 'Doe',
     sex: 'male',
+    hobbies: ['riding', 'painting'],
   },
   {
     id: 223456789,
     firstName: 'Jane',
     lastName: 'Doe',
     sex: 'female',
+    hobbies: ['tennis', 'clarinet', 'sci-fi'],
   },
   // ...etc
 ];
@@ -84,7 +94,7 @@ const payload = pack(persons, schema);
 
 The `pack()` function returns an `ArrayBuffer`, which you can then send over the network.
 
-For the sake of reference: if you sent the above array of two objects in minified JSON, it would have a payload size of **144 bytes**. Processed with BytePacker, this drops to **29 bytes** (80% decrease in size).
+For the sake of comparison: if you sent the above array of two objects in minified JSON, it would have a payload size of **208 bytes**. Processed with BytePacker, this drops to **70 bytes** (66% decrease in size).
 
 _Note: If any objects contain fields that are not listed in the schema, those fields will be silently ignored._
 
@@ -191,6 +201,7 @@ _Note: If `unpack()` is called with a self-describing payload **and** a schema o
 | `string`  | String (encoded in UTF-8 with null terminator)                                     |
 | `enum`    | One of a predefined list of options, stored as an index [(see below)](#type-field) |
 | `date`    | Date, optionally with time [(see below)](#type-field)                              |
+| `array`   | Array of elements with a predefined type [(see below)](#type-field)                |
 
 The `varint` type is useful if you expect values to randomly fall anywhere within the allowed range, from single-digits to the hundreds of thousands. Storing them as variable-length instead of `uint32` can help you shave a few more bytes off the payload by using fewer bytes for lower values.
 
@@ -211,10 +222,20 @@ Describes a schema used for packing and unpacking arrays of objects. BytePacker 
 type Field = {
   name: string;
   nullable?: boolean;
-} & (SimpleType | EnumType | DateType);
+} & (SimpleType | EnumType | DateType | ArrayType);
 
 type SimpleType = {
-  type: 'int8' | 'int16' | 'int32' | 'float' | 'boolean' | 'string';
+  type:
+    | 'int8'
+    | 'int16'
+    | 'int32'
+    | 'uint8'
+    | 'uint16'
+    | 'uint32'
+    | 'varint'
+    | 'float'
+    | 'boolean'
+    | 'string';
 };
 
 type EnumType = {
@@ -226,14 +247,25 @@ type DateType = {
   type: 'date';
   precision?: 'day' | 'minute' | 'second' | 'ms';
 };
+
+type ArrayType = {
+  type: 'array';
+  arrayOf: {
+    nullable?: boolean;
+  } & (SimpleType | EnumType | DateType | ArrayType);
+};
 ```
 
 Describes a field in the schema.
 
 - All fields must have a `name` and `type` specified.
 - The `nullable` flag is assumed to be `false` if omitted.
-- Fields with a type of `enum` _must_ also have an `enumOf` property, which is an array of strings that contains all possible values of the field.
-- Fields with a type of `date` _may_ also have a `precision` propety, which specifies whether time data should also be stored, and if yes, to what precision. If not specified, defaults to `day`. Less precision requires fewer bytes to store; time data that is not covered by the specified precision will be nondeterministic at unpacking.
+- **Fields with a type of `enum`** _must_ also have an `enumOf` property, which is an array of strings that contains all possible values of the field.
+- **Fields with a type of `date`** _may_ also have a `precision` propety, which specifies whether time data should also be stored, and if yes, to what precision. If not specified, defaults to `day` (i.e. no time data).
+  - Dates are be converted to UTC when packed.
+  - Less precision requires fewer bytes to store.
+  - Time data that is not covered by the specified precision will be nondeterministic at unpacking.
+- **Fields with a type of `array`** _must_ also have an `arrayOf` property, which specifies of the type of the items in the array. This property works exactly like a proper field definition, with the exception that it does not have a name. The array is only allowed to contain `null` values if the `nullable` property of `arrayOf` is set to true.
 
 ## **`function pack()`**
 
@@ -296,15 +328,16 @@ The numeric codes for the field types are as follows:
 | `uint16`  |       10 |
 | `uint32`  |       11 |
 | `date`    |       12 |
+| `array`   |       13 |
 
-Fields with the type `enum` have additional information following the type and name:
+**Fields with the type `enum`** have additional information following the type and name:
 
 | **data**              |                         **length** | **description**                                                      |
 | --------------------- | ---------------------------------: | -------------------------------------------------------------------- |
 | **enum option count** |                                 1B | The number of possible enum values (max. 255).                       |
 | **enum options**      | (_(varies)_ + 1B) x (option count) | Each enum option is listed as a UTF-8 string with a null terminator. |
 
-Fields with the type `date` must also specify the required precision with a numeric code after the type and name:
+**Fields with the type `date`** must also specify the required precision with a numeric code after the type and name:
 
 | **precision** | **code** |
 | ------------: | -------: |
@@ -312,6 +345,8 @@ Fields with the type `date` must also specify the required precision with a nume
 |      `minute` |        2 |
 |      `second` |        3 |
 |          `ms` |        4 |
+
+**Fields with the type `array`** must also specify the type of the array items. This is described exactly the same as a proper field definition, with the name set to an empty string.
 
 ## Object definitions
 
@@ -328,6 +363,9 @@ The feature byte and optional header are followed immediately by the object defi
 | `enum`             |               1B | Index of the value within the array of options listed in the `enumOf` property of the field |
 | `varint`           |       _(varies)_ | (See below)                                                                                 |
 | `date`             |       _(varies)_ | (See below)                                                                                 |
+| `array`            |       _(varies)_ | (See below)                                                                                 |
+
+**`varint` values**
 
 The length of a `varint` value depends on the value itself. These values are encoded the same way as UTF-8 characters.
 
@@ -337,6 +375,8 @@ The length of a `varint` value depends on the value itself. These values are enc
 |      128 .. 2047 |               2B |
 |    2048 .. 65535 |               3B |
 | 65536 .. 1112064 |               4B |
+
+**`date` values**
 
 The length and data of `date` values depends on the precision:
 
@@ -352,7 +392,17 @@ The length and data of `date` values depends on the precision:
 
 Thus, the `day` precision requires 4 bytes (2B year + 1B month + 1B day), the `minute` precision requires 6 bytes (`day` precision + 1B hours + 1B minutes), and so on.
 
-### Null bytes
+**`array` values**
+
+Arrays are packed as follows:
+
+- First, the length of the array is packed as a `varint` value.
+- If the `nullable` flag in the `arrayOf` type definition was set to true, then the length is followed by a byte sequence that indicates which items of the array are null. See below for details.
+- Finally, the non-null items of the array are encoded according to the `arrayOf` type definition.
+
+### Null values
+
+**In objects**
 
 If the schema contains **nullable fields**, each object is _prefixed_ by a sequence of bytes (called _null bytes_) that indicate which fields are null. The number of null bytes per object is the number of nullable bytes in the schema, divided by 8, and rounded up. I.e., if there are 1 to 8 nullable fields, there will be 1 null byte per object; if there are 9 to 16, there will be 2, etc.
 
@@ -398,6 +448,39 @@ With this schema, each object will be prefixed with 1 null byte (2 nullable fiel
 3. In the third object, `c` is `null`. Since `c` is the second _nullable_ field, the second least significant bit of the null byte is set. The null byte is then followed by all the non-null values.
 4. In the fourth object, `a` and `c` are both `null`; thus, both the least and second least significant bits of the null byte are set. The null byte is then followed by all the non-null values.
 
+**In arrays**
+
+Null values in arrays are encoded in a similar, but simpler manner. In this case, each bit in the sequence corresponds to an element in the array; thus, the total number of null bytes will be the length of the complete array, divided by 8 and rounded up. If the n-th least significant bit is set, it means the n-th item in the array is `null`.
+
+Consider the following example:
+
+```typescript
+const schema = {
+  fields: [
+    {
+      name: 'numbers',
+      type: 'array',
+      arrayOf: {
+        type: 'int8',
+        nullable: true,
+      },
+    },
+  ],
+};
+
+const input = [{ numbers: [null, 1, 2, null, 3, null, null, 4, 5, 6] }];
+```
+
+With this schema, the value of the field `numbers` in the object will be encoded as follows:
+
+```
+10 0b0000000001101001 1 2 3 4 5 6
+```
+
+1. First, the length of the array is encoded as a `varint`; here, this is `10`.
+2. Next are the null bytes, here shown in binary. Because the array has 10 items, 2 null bytes are required (10 divided by 8, rounded up to 2). The first, fourth, sixth and seventh item of the array is `null`; therefore the 1st, 4th, 6th and 7th least significant bits of the sequence are set.
+3. Finally, after the null bytes, the non-null values are encoded normally.
+
 # To-Do's and Roadmap
 
 The following sections describe potential improvements to the library. Feel free to offer comments or suggestions as Issues.
@@ -405,31 +488,6 @@ The following sections describe potential improvements to the library. Feel free
 ## Tests
 
 Currently, tests are written in plain NodeJS, and only serve to test basic functionality. A more thorough suite of tests in one of the more professional testing frameworks would be desirable.
-
-## Field type `array`
-
-```typescript
-type ArrayType = {
-  type: 'array';
-  arrayOf: SimpleType | EnumType | ArrayType | DateType;
-};
-```
-
-Allow objects to contain arrays.
-
-In a self-describing header, the name of an array field should be followed by the type of its items.
-
-In the payload, an array value should consist of the number of items, followed by the item values, encoded according to the type specified in `arrayOf`. Since the number of items in an array should not be limited, but we also do not want to add unnecessary bytes to the payload by always using 16 or 32-bit integers, the number of items should be encoded in the same variable-length format as UTF-8 characters.
-
-Open questions:
-
-- Should `null` values be allowed in arrays?
-  - How should they be encoded? One possible way is to use a bit string somehow, similar to null bytes at the start of objects.
-  - If yes, it should still be controlled on a per-field basis, i.e. `ArrayType` should also contain an optional `itemsNullable` flag.
-
-Error handling:
-
-- When validating the schema, assert that `arrayOf` is specfied and is a valid field type specification.
 
 ## Field type `object`
 
@@ -449,3 +507,21 @@ In the payload, a nested object value should be encoded exactly the same way as 
 Error handling:
 
 - When validating the schema, assert that `fields` is specfied and is an array of valid field type specifications.
+
+## Cursors
+
+```typescript
+interface Cursor<T = any> {
+  new (payload: ArrayBuffer, schema?: Schema): Cursor;
+
+  [Symbol.iterator]: Iterator<T>;
+
+  get length(): number;
+  forEach(callback: T => void);
+  get(index: number): T;
+
+  getSchema(): Schema;
+}
+```
+
+Instead of using `unpack` to get all objects at the same time, a `Cursor` can allow client code to get individual objects, either directly by index, or via a loop.
