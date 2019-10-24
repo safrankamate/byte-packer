@@ -50,8 +50,7 @@ function measureRow(fields, row) {
     return fields.reduce((total, field) => total + measureValue(field, row[field.name]), 0);
 }
 function measureValue(field, value) {
-    if (value === null || value === undefined)
-        return 0;
+    validate_1.validateValue(value, field);
     return packValue(field, value);
 }
 // Packing
@@ -109,7 +108,6 @@ function packRow({ fields, nullBytes }, row, view, i0) {
     return i - i0;
 }
 function packValue(field, value, view, i) {
-    validate_1.validateValue(value, field);
     if (value === null || value === undefined) {
         return 0;
     }
