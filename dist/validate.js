@@ -48,8 +48,9 @@ const rejectEnum = (name, enumOf) => (!Array.isArray(enumOf) &&
         `Field ${name} contains invalid enum options`) ||
     (new Set(enumOf).size !== enumOf.length &&
         `Field ${name} must contain unique enum options.`);
-const rejectArray = (name, arrayOf) => ((typeof arrayOf !== 'object' && `Field ${name} must have a valid arrayOf property`) ||
-    rejectField({ name: `${name}'s type definition`, ...arrayOf }, new Set()));
+const rejectArray = (name, arrayOf) => (typeof arrayOf !== 'object' &&
+    `Field ${name} must have a valid arrayOf property`) ||
+    rejectField({ name: `${name}'s type definition`, ...arrayOf }, new Set());
 // Input validation
 const rejectNull = (value, { nullable }) => !nullable &&
     (value === null || value === undefined) &&
@@ -89,4 +90,10 @@ const rejectValue = (value, { type, nullable, ...field }) => (IntegerTypes.has(t
         `Non-string value ${value}`) ||
     (type === 'enum' &&
         !field.enumOf.includes(value) &&
-        `Value ${value} not listed in enum options`);
+        `Value ${value} not listed in enum options`) ||
+    (type === 'date' &&
+        !(value instanceof Date) &&
+        `Value ${value} is not a Date object`) ||
+    (type === 'array' &&
+        !Array.isArray(value) &&
+        `Value ${value} is not an array`);

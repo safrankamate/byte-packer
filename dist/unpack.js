@@ -183,30 +183,30 @@ function unpackDate(view, i0, precIndex) {
     }
     return [value, bytes];
 }
-function unpackArray(view, i0, field) {
+function unpackArray(view, i0, { arrayOf }) {
     let i = i0;
     const drop = [];
     i += unpackVarInt(view, i0, drop);
     const [length] = drop;
-    let nullFlags = 0;
-    if (field.arrayOf.nullable) {
-        const nullBytes = Math.ceil(length / 8);
-        for (let j = 0; j < nullBytes; j++) {
-            nullFlags = (nullFlags << 8) | view.getUint8(i + j);
-        }
+    const nullBytes = Math.ceil(length / 8);
+    const nullOffset = i;
+    const values = [];
+    if (arrayOf.nullable) {
         i += nullBytes;
     }
-    const values = [];
     for (let j = 0; j < length; j++) {
-        if (nullFlags & 1) {
+        const nullByte = Math.trunc(j / 8);
+        const nullBit = j % 8;
+        const isNull = arrayOf.nullable &&
+            (view.getUint8(nullOffset + nullBytes - 1 - nullByte) >>> nullBit) & 1;
+        if (isNull) {
             values.push(null);
         }
         else {
-            const [value, valueBytes] = unpackValue(field.arrayOf, view, i);
+            const [value, valueBytes] = unpackValue(arrayOf, view, i);
             values.push(value);
             i += valueBytes;
         }
-        nullFlags = nullFlags >>> 1;
     }
     return [values, i - i0];
 }

@@ -56,4 +56,6 @@ module.exports = function() {
     packedSize,
     Math.round(100 - 100 * (packedSize / jsonSize)),
   );
+
+  return true;
 };
