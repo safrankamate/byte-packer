@@ -74,7 +74,7 @@ function measureRow(fields: Field[], row: any): number {
 }
 
 function measureValue(field: Field, value: any): number {
-  if (value === null || value === undefined) return 0;
+  validateValue(value, field);
   return packValue(field, value);
 }
 
@@ -156,8 +156,6 @@ function packValue(
   view?: DataView,
   i?: number,
 ): number {
-  validateValue(value, field);
-
   if (value === null || value === undefined) {
     return 0;
   }
