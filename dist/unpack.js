@@ -46,7 +46,7 @@ function unpackField(view, fields, i0) {
     const typeByte = view.getUint8(i0);
     const type = schema_1.TypeCodes[typeByte & 0b00001111];
     if (!type)
-        validate_1.fail(`Invalid type byte ${typeByte} as index ${i0}`);
+        validate_1.fail(`Invalid type byte ${typeByte} at index ${i0}`);
     const nullable = !!(typeByte & HIGH_1);
     const [name, nameLength] = unpackString(view, i0 + 1);
     const field = { name, type, nullable };

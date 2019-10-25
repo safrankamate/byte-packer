@@ -226,27 +226,26 @@ function packDate(value, precIndex, view, i0) {
 function packArray(values, type, view, i0) {
     let i = i0 || 0;
     i += packVarInt(values.length, view, i0);
+    const nullOffset = i;
+    const nullBytes = Math.ceil(values.length / 8);
     if (type.arrayOf.nullable) {
-        const nullBytes = Math.ceil(values.length / 8);
-        if (view) {
-            let nullFlags = 0;
-            for (let j = 0; j < values.length; j++) {
-                if (values[j] === null) {
-                    nullFlags |= 1 << j;
-                }
-            }
-            for (let j = 0; j < nullBytes; j++) {
-                view.setUint8(i + (nullBytes - j - 1), (nullFlags >>> (j * 8)) & 0xff);
-            }
-        }
         i += nullBytes;
     }
     const valueType = {
         ...type.arrayOf,
         name: type.name,
     };
-    for (const value of values) {
-        i += packValue(valueType, value, view, i);
+    for (let j = 0; j < values.length; j++) {
+        const value = values[j];
+        if (view && (value === null || value === undefined)) {
+            const nullByte = nullOffset + nullBytes - 1 - Math.trunc(j / 8);
+            const nullBit = j % 8;
+            const nullFlags = view.getUint8(nullByte);
+            view.setUint8(nullByte, nullFlags | (1 << nullBit));
+        }
+        else {
+            i += packValue(valueType, value, view, i);
+        }
     }
     return i - (i0 || 0);
 }
