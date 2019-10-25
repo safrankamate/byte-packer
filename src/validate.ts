@@ -110,4 +110,8 @@ const rejectValue = (value: any, { type, nullable, ...field }: Field) =>
     `Value ${value} is not a Date object`) ||
   (type === 'array' &&
     !Array.isArray(value) &&
-    `Value ${value} is not an array`);
+    `Value ${value} is not an array`) ||
+  (type === 'array' &&
+    !nullable &&
+    value.some((item: any) => item === null) &&
+    `Null value in non-nullable array`);
