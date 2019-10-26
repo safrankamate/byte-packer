@@ -4,17 +4,23 @@ module.exports = function() {
   const persons = [
     {
       id: 123456789,
-      firstName: 'John',
-      lastName: 'Doe',
+      name: 'John Doe',
       sex: 'male',
       hobbies: ['riding', 'painting'],
+      contact: {
+        email: 'john.doe@example.com',
+        phone: '555-9323',
+      },
     },
     {
       id: 223456789,
-      firstName: 'Jane',
-      lastName: 'Doe',
+      name: 'Jane Doe',
       sex: 'female',
       hobbies: ['tennis', 'clarinet', 'sci-fi'],
+      contact: {
+        email: 'jane.doe@example.com',
+        phone: '555-4876',
+      },
     },
   ];
 
@@ -25,11 +31,7 @@ module.exports = function() {
         type: 'int32',
       },
       {
-        name: 'firstName',
-        type: 'string',
-      },
-      {
-        name: 'lastName',
+        name: 'name',
         type: 'string',
       },
       {
@@ -43,6 +45,20 @@ module.exports = function() {
         arrayOf: {
           type: 'string',
         },
+      },
+      {
+        name: 'contact',
+        type: 'object',
+        fields: [
+          {
+            name: 'email',
+            type: 'string',
+          },
+          {
+            name: 'phone',
+            type: 'string',
+          },
+        ],
       },
     ],
   });
