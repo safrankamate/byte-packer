@@ -4,41 +4,30 @@ const { unpack } = require('../dist/unpack');
 module.exports = function run(name, input, schema, check = compare) {
   console.log('\nCase', name);
   console.log('* with schema');
-  const schemaOk = runWithSchema(input, schema, check);
+  const schemaOk = execute(input, schema, check);
 
   console.log('* self-describing');
-  const selfOk = runSelfDescribing(input, schema, check);
+  const selfOk = execute(input, { ...schema, selfDescribing: true }, check);
 
   return schemaOk && selfOk;
 };
 
-function runWithSchema(input, schema, check) {
+function execute(input, schema, check) {
   try {
     const buffer = pack(input, schema);
     const result = unpack(buffer, schema);
     return check(input, result);
   } catch (e) {
     console.error('*** Exception caught:', e.message);
-    return false;
-  }
-}
-
-function runSelfDescribing(input, schema, check) {
-  try {
-    const buffer = pack(input, {
-      ...schema,
-      selfDescribing: true,
-    });
-    const result = unpack(buffer);
-    return check(input, result);
-  } catch (e) {
-    console.error('*** Exception caught:', e.message);
+    if (!e.message.startsWith('byte-packer')) {
+      console.error(e);
+    }
     return false;
   }
 }
 
 function compare(input, result) {
-  const ok = true;
+  let ok = true;
   for (let i = 0; i < input.length; i++) {
     let hasError = false;
     for (const key in input[i]) {
