@@ -11,6 +11,7 @@ function unpack(buffer, inSchema) {
     let i = 1;
     if (hasSchema(view)) {
         schema.fields = [];
+        i += 2;
         i += unpackSchema(view, schema.fields, i);
         schema.nullBytes = countNullables(schema.fields);
     }
@@ -35,8 +36,8 @@ function hasSchema(view) {
     return !!(view.getUint8(0) & HIGH_1);
 }
 function unpackSchema(view, fields, i0) {
-    const fieldCount = view.getUint8(i0 + 2);
-    let i = i0 + 3;
+    const fieldCount = view.getUint8(i0);
+    let i = i0 + 1;
     for (let c = 0; c < fieldCount; c++) {
         i += unpackField(view, fields, i);
     }
@@ -71,6 +72,11 @@ function unpackField(view, fields, i0) {
         const [valueType] = drop;
         delete valueType.name;
         field.arrayOf = { ...valueType };
+    }
+    else if (field.type === 'object') {
+        const subs = [];
+        i += unpackSchema(view, subs, i);
+        field.fields = subs;
     }
     fields.push(field);
     return i - i0;
@@ -128,6 +134,8 @@ function unpackValue(field, view, i) {
             return unpackDate(view, i, schema_1.DatePrecisions.indexOf(field.precision));
         case 'array':
             return unpackArray(view, i, field);
+        case 'object':
+            return unpackObject(view, i, field.fields);
     }
 }
 function unpackString(view, i0) {
@@ -209,4 +217,14 @@ function unpackArray(view, i0, { arrayOf }) {
         }
     }
     return [values, i - i0];
+}
+function unpackObject(view, i0, fields) {
+    let i = i0;
+    const drop = [];
+    const schema = {
+        fields,
+        nullBytes: countNullables(fields),
+    };
+    i += unpackRow(schema, view, i, drop);
+    return [drop[0], i - i0];
 }

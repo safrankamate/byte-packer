@@ -13,6 +13,7 @@ function validatePack(rows, schema) {
     if (schema) {
         validateSchema(schema);
     }
+    return true;
 }
 exports.validatePack = validatePack;
 function validateSchema(schema) {
@@ -25,6 +26,7 @@ function validateSchema(schema) {
             fail(error);
         names.add(field.name);
     }
+    return true;
 }
 exports.validateSchema = validateSchema;
 function validateValue(value, field) {
@@ -33,6 +35,7 @@ function validateValue(value, field) {
         : rejectNull(value, field) || rejectValue(value, field);
     if (error)
         fail(`${error} in field ${field.name}`);
+    return true;
 }
 exports.validateValue = validateValue;
 const rejectField = ({ name, type, ...field }, names) => (!name && 'Fields must have a name property.') ||
@@ -40,7 +43,8 @@ const rejectField = ({ name, type, ...field }, names) => (!name && 'Fields must 
     (names.has(name) && `Duplicate field name in schema: ${name}`) ||
     (!FieldTypes.has(type) && `Field ${name} has invalid type ${type}`) ||
     (type === 'enum' && rejectEnum(name, field.enumOf)) ||
-    (type === 'array' && rejectArray(name, field.arrayOf));
+    (type === 'array' && rejectArray(name, field.arrayOf)) ||
+    (type === 'object' && !validateSchema(field));
 const rejectEnum = (name, enumOf) => (!Array.isArray(enumOf) &&
     `Field ${name} has enum type but no enumOf property`) ||
     (enumOf.length === 1 && `Field ${name} has empty array for enumOf`) ||
@@ -96,4 +100,8 @@ const rejectValue = (value, { type, nullable, ...field }) => (IntegerTypes.has(t
         `Value ${value} is not a Date object`) ||
     (type === 'array' &&
         !Array.isArray(value) &&
-        `Value ${value} is not an array`);
+        `Value ${value} is not an array`) ||
+    (type === 'array' &&
+        !nullable &&
+        value.some((item) => item === null) &&
+        `Null value in non-nullable array`);

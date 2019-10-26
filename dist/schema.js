@@ -14,6 +14,7 @@ exports.Types = {
     Enum: 'enum',
     Date: 'date',
     Array: 'array',
+    Object: 'object',
 };
 exports.TypeCodes = [
     undefined,
@@ -30,6 +31,7 @@ exports.TypeCodes = [
     'uint32',
     'date',
     'array',
+    'object',
 ];
 exports.DatePrecisions = [
     undefined,

@@ -22,11 +22,12 @@ function pack(rows, inSchema) {
 }
 exports.pack = pack;
 // Measurement
-function measure({ fields, nullBytes, selfDescribing }, rows) {
+function measure(schema, rows) {
+    const { fields, nullBytes, selfDescribing } = schema;
     const headerLength = selfDescribing
         ? 2 + 1 + fields.reduce((total, field) => total + measureField(field), 0)
         : 0;
-    const bodyLength = rows.reduce((total, row) => total + nullBytes + measureRow(fields, row), 0);
+    const bodyLength = rows.reduce((total, row) => total + packRow(schema, row), 0);
     return 1 + headerLength + bodyLength;
 }
 function countNullables(fields) {
@@ -44,14 +45,11 @@ function measureField(field) {
     else if (field.type === 'array') {
         bytes += measureField({ ...field.arrayOf, name: '' });
     }
+    else if (field.type === 'object') {
+        bytes +=
+            1 + field.fields.reduce((total, sub) => total + measureField(sub), 0);
+    }
     return bytes;
-}
-function measureRow(fields, row) {
-    return fields.reduce((total, field) => total + measureValue(field, row[field.name]), 0);
-}
-function measureValue(field, value) {
-    validate_1.validateValue(value, field);
-    return packValue(field, value);
 }
 // Packing
 const HIGH_1 = 0b10000000;
@@ -85,9 +83,17 @@ function packField(field, view, i0) {
     else if (field.type === 'array') {
         i += packField({ ...field.arrayOf, name: '' }, view, i);
     }
+    else if (field.type === 'object') {
+        view.setUint8(i, field.fields.length);
+        i++;
+        for (const sub of field.fields) {
+            i += packField(sub, view, i);
+        }
+    }
     return i - i0;
 }
 function packRow({ fields, nullBytes }, row, view, i0) {
+    i0 = i0 || 0;
     let i = i0 + nullBytes;
     let nullables = 0;
     let nullFlags = 0;
@@ -101,9 +107,11 @@ function packRow({ fields, nullBytes }, row, view, i0) {
         }
         i += packValue(field, value, view, i);
     }
-    for (let b = nullBytes - 1; b >= 0; b--) {
-        view.setUint8(i0 + b, nullFlags & 0xff);
-        nullFlags = nullFlags >>> 8;
+    if (view) {
+        for (let b = nullBytes - 1; b >= 0; b--) {
+            view.setUint8(i0 + b, nullFlags & 0xff);
+            nullFlags = nullFlags >>> 8;
+        }
     }
     return i - i0;
 }
@@ -148,6 +156,8 @@ function packValue(field, value, view, i) {
             return packDate(value, schema_1.DatePrecisions.indexOf(field.precision), view, i);
         case 'array':
             return packArray(value, field, view, i);
+        case 'object':
+            return packObject(value, field.fields, view, i);
     }
     return 0;
 }
@@ -224,7 +234,8 @@ function packDate(value, precIndex, view, i0) {
     return bytes;
 }
 function packArray(values, type, view, i0) {
-    let i = i0 || 0;
+    i0 = i0 || 0;
+    let i = i0;
     i += packVarInt(values.length, view, i0);
     const nullOffset = i;
     const nullBytes = Math.ceil(values.length / 8);
@@ -247,5 +258,12 @@ function packArray(values, type, view, i0) {
             i += packValue(valueType, value, view, i);
         }
     }
-    return i - (i0 || 0);
+    return i - i0;
+}
+function packObject(value, fields, view, i0) {
+    const schema = {
+        nullBytes: countNullables(fields),
+        fields,
+    };
+    return packRow(schema, value, view, i0);
 }
