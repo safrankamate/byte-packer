@@ -13,18 +13,30 @@ module.exports = function run(name, input, schema, check = compare) {
 };
 
 function runWithSchema(input, schema, check) {
-  const buffer = pack(input, schema);
-  const result = unpack(buffer, schema);
-  return check(input, result);
+  try {
+    const buffer = pack(input, schema);
+    const result = unpack(buffer, schema);
+    return check(input, result);
+  } catch (e) {
+    console.error('*** ERROR');
+    console.error(e);
+    return false;
+  }
 }
 
 function runSelfDescribing(input, schema, check) {
-  const buffer = pack(input, {
-    ...schema,
-    selfDescribing: true,
-  });
-  const result = unpack(buffer);
-  return check(input, result);
+  try {
+    const buffer = pack(input, {
+      ...schema,
+      selfDescribing: true,
+    });
+    const result = unpack(buffer);
+    return check(input, result);
+  } catch (e) {
+    console.error('*** ERROR');
+    console.error(e);
+    return false;
+  }
 }
 
 function compare(input, result) {

@@ -2,6 +2,7 @@ const ALL_SUITES = [
   'trivial',
   'dates',
   'arrays',
+  'objects',
   'complex',
   'errors',
   'compare',

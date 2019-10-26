@@ -12,20 +12,24 @@ module.exports = function() {
           lastName: 'Doe',
           age: 33,
           sex: 'm',
+          hobbies: ['hiking', 'painting'],
         },
         {
           lastName: 'Sting',
           sex: 'm',
+          hobbies: ['singing', 'yoga'],
         },
         {
           lastName: 'Madonna',
           age: 21,
           sex: 'f',
+          hobbies: ['dancing', 'qabbalah', 'fashion'],
         },
         {
           firstName: 'Cher',
           lastName: 'Bono',
           sex: 'nb',
+          hobbies: ['plastic surgery'],
         },
       ],
       {
@@ -34,6 +38,7 @@ module.exports = function() {
           { name: 'lastName', type: 'string' },
           { name: 'age', type: 'int8', nullable: true },
           { name: 'sex', type: 'enum', enumOf: ['m', 'f', 'nb', 'rns'] },
+          { name: 'hobbies', type: 'array', arrayOf: { type: 'string' } },
         ],
       },
     ),
