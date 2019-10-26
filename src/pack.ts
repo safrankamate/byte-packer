@@ -60,20 +60,11 @@ function measureField(field: Field): number {
     bytes += 1;
   } else if (field.type === 'array') {
     bytes += measureField({ ...field.arrayOf, name: '' });
+  } else if (field.type === 'object') {
+    bytes +=
+      1 + field.fields.reduce((total, sub) => total + measureField(sub), 0);
   }
   return bytes;
-}
-
-function measureRow(fields: Field[], row: any): number {
-  return fields.reduce(
-    (total, field) => total + measureValue(field, row[field.name]),
-    0,
-  );
-}
-
-function measureValue(field: Field, value: any): number {
-  validateValue(value, field);
-  return packValue(field, value);
 }
 
 // Packing
@@ -116,6 +107,12 @@ function packField(field: Field, view: DataView, i0: number): number {
     i++;
   } else if (field.type === 'array') {
     i += packField({ ...field.arrayOf, name: '' }, view, i);
+  } else if (field.type === 'object') {
+    view.setUint8(i, field.fields.length);
+    i++;
+    for (const sub of field.fields) {
+      i += packField(sub, view, i);
+    }
   }
   return i - i0;
 }

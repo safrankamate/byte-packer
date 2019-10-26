@@ -58,14 +58,16 @@ module.exports = function() {
       fields: [{ name: 'foo', type: 'array', arrayOf: { type: 'enum' } }],
     }),
     runForError('Invalid type definition in nested array field', [{}], {
-      fields: [{
-        name: 'foo',
-        type: 'array',
-        arrayOf: {
+      fields: [
+        {
+          name: 'foo',
           type: 'array',
-          arrayOf: { type: 'enum' },
+          arrayOf: {
+            type: 'array',
+            arrayOf: { type: 'enum' },
+          },
         },
-      }],
+      ],
     }),
   ];
 
@@ -73,12 +75,9 @@ module.exports = function() {
 };
 
 function runForError(name, input, schema) {
-  try {
-    run(name, input, schema);
+  run(name, input, schema, () => {
     console.error('!!! No error caught !!!');
     return false;
-  } catch (e) {
-    console.log('Caught ', e.message);
-    return true;
-  }
+  });
+  return true;
 }

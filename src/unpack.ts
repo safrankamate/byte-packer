@@ -15,6 +15,7 @@ export function unpack<T = any>(buffer: ArrayBuffer, inSchema?: Schema): T[] {
   let i = 1;
   if (hasSchema(view)) {
     schema.fields = [];
+    i += 2;
     i += unpackSchema(view, schema.fields, i);
     schema.nullBytes = countNullables(schema.fields);
   } else if (!inSchema) {
@@ -48,8 +49,8 @@ function hasSchema(view: DataView): boolean {
 }
 
 function unpackSchema(view: DataView, fields: Field[], i0: number): number {
-  const fieldCount = view.getUint8(i0 + 2);
-  let i = i0 + 3;
+  const fieldCount = view.getUint8(i0);
+  let i = i0 + 1;
   for (let c = 0; c < fieldCount; c++) {
     i += unpackField(view, fields, i);
   }
@@ -87,6 +88,10 @@ function unpackField(view: DataView, fields: Field[], i0: number): number {
     const [valueType] = drop;
     delete valueType.name;
     field.arrayOf = { ...valueType };
+  } else if (field.type === 'object') {
+    const subs: Field[] = [];
+    i += unpackSchema(view, subs, i);
+    field.fields = subs;
   }
 
   fields.push(field as Field);

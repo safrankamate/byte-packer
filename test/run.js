@@ -18,8 +18,7 @@ function runWithSchema(input, schema, check) {
     const result = unpack(buffer, schema);
     return check(input, result);
   } catch (e) {
-    console.error('*** ERROR');
-    console.error(e);
+    console.error('*** Exception caught:', e.message);
     return false;
   }
 }
@@ -33,8 +32,7 @@ function runSelfDescribing(input, schema, check) {
     const result = unpack(buffer);
     return check(input, result);
   } catch (e) {
-    console.error('*** ERROR');
-    console.error(e);
+    console.error('*** Exception caught:', e.message);
     return false;
   }
 }
