@@ -34,7 +34,7 @@ function measure<T = any>(schema: SchemaPlus, rows: T[]): number {
     ? 2 + 1 + fields.reduce((total, field) => total + measureField(field), 0)
     : 0;
   const bodyLength = rows.reduce(
-    (total, row) => total + nullBytes + packRow(schema, row),
+    (total, row) => total + packRow(schema, row),
     0,
   );
 
@@ -146,6 +146,7 @@ function packRow(
       nullFlags = nullFlags >>> 8;
     }
   }
+
   return i - i0;
 }
 

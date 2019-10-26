@@ -41,8 +41,22 @@ module.exports = function() {
           { name: 'hobbies', type: 'array', arrayOf: { type: 'string' } },
         ],
       },
+      checkObjects,
     ),
   ];
 
   return results.every(Boolean);
 };
+
+function checkObjects([input], [result]) {
+  const inputJson = JSON.stringify(input);
+  const resultJson = JSON.stringify(result);
+  if (inputJson === resultJson) {
+    return true;
+  } else {
+    console.error('Object mismatch:');
+    console.error('Expected', inputJson);
+    console.error('Got:', resultJson);
+    return false;
+  }
+}
