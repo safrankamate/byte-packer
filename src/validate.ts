@@ -6,16 +6,17 @@ export function fail(message: string): never {
 
 const FieldTypes = new Set<string>(Object.values(Types));
 
-export function validatePack(rows: any[], schema: Schema) {
+export function validatePack(rows: any[], schema: Schema): boolean {
   if (!Array.isArray(rows)) {
     fail('First argument of pack() must be an array.');
   }
   if (schema) {
     validateSchema(schema);
   }
+  return true;
 }
 
-export function validateSchema(schema: Schema) {
+export function validateSchema(schema: Schema): boolean {
   if (!Array.isArray(schema.fields)) fail('Schema must contain field specs.');
 
   const names = new Set<string>();
@@ -24,13 +25,15 @@ export function validateSchema(schema: Schema) {
     if (error) fail(error);
     names.add(field.name);
   }
+  return true;
 }
 
-export function validateValue(value: any, field: Field) {
+export function validateValue(value: any, field: Field): boolean {
   const error = field.nullable
     ? value !== null && value !== undefined && rejectValue(value, field)
     : rejectNull(value, field) || rejectValue(value, field);
   if (error) fail(`${error} in field ${field.name}`);
+  return true;
 }
 
 // Schema validation
@@ -44,7 +47,8 @@ const rejectField = ({ name, type, ...field }: Field, names: Set<string>) =>
   (names.has(name) && `Duplicate field name in schema: ${name}`) ||
   (!FieldTypes.has(type) && `Field ${name} has invalid type ${type}`) ||
   (type === 'enum' && rejectEnum(name, (field as EnumDetails).enumOf)) ||
-  (type === 'array' && rejectArray(name, (field as ArrayDetails).arrayOf));
+  (type === 'array' && rejectArray(name, (field as ArrayDetails).arrayOf)) ||
+  (type === 'object' && !validateSchema(field as Schema));
 
 const rejectEnum = (name: string, enumOf: string[]) =>
   (!Array.isArray(enumOf) &&

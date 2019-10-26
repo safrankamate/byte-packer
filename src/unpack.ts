@@ -159,6 +159,8 @@ function unpackValue(field: Field, view: DataView, i: number): [any, number] {
       return unpackDate(view, i, DatePrecisions.indexOf(field.precision));
     case 'array':
       return unpackArray(view, i, field);
+    case 'object':
+      return unpackObject(view, i, field.fields);
   }
 }
 
@@ -263,4 +265,19 @@ function unpackArray(
   }
 
   return [values, i - i0];
+}
+
+function unpackObject(
+  view: DataView,
+  i0: number,
+  fields: Field[],
+): [any, number] {
+  let i = i0;
+  const drop = [];
+  const schema: SchemaPlus = {
+    fields,
+    nullBytes: countNullables(fields),
+  };
+  i += unpackRow(schema, view, i, drop);
+  return [drop[0], i - i0];
 }

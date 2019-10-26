@@ -28,15 +28,13 @@ export function pack<T = any>(rows: T[], inSchema: Schema): ArrayBuffer {
 
 // Measurement
 
-function measure<T = any>(
-  { fields, nullBytes, selfDescribing }: SchemaPlus,
-  rows: T[],
-): number {
+function measure<T = any>(schema: SchemaPlus, rows: T[]): number {
+  const { fields, nullBytes, selfDescribing } = schema;
   const headerLength = selfDescribing
     ? 2 + 1 + fields.reduce((total, field) => total + measureField(field), 0)
     : 0;
   const bodyLength = rows.reduce(
-    (total, row) => total + nullBytes + measureRow(fields, row),
+    (total, row) => total + nullBytes + packRow(schema, row),
     0,
   );
 
@@ -125,10 +123,12 @@ function packField(field: Field, view: DataView, i0: number): number {
 function packRow(
   { fields, nullBytes }: SchemaPlus,
   row: any,
-  view: DataView,
-  i0: number,
+  view?: DataView,
+  i0?: number,
 ): number {
+  i0 = i0 || 0;
   let i = i0 + nullBytes;
+
   let nullables = 0;
   let nullFlags = 0;
   for (let field of fields) {
@@ -143,9 +143,11 @@ function packRow(
     i += packValue(field, value, view, i);
   }
 
-  for (let b = nullBytes - 1; b >= 0; b--) {
-    view.setUint8(i0 + b, nullFlags & 0xff);
-    nullFlags = nullFlags >>> 8;
+  if (view) {
+    for (let b = nullBytes - 1; b >= 0; b--) {
+      view.setUint8(i0 + b, nullFlags & 0xff);
+      nullFlags = nullFlags >>> 8;
+    }
   }
   return i - i0;
 }
@@ -197,6 +199,8 @@ function packValue(
       return packDate(value, DatePrecisions.indexOf(field.precision), view, i);
     case 'array':
       return packArray(value, field, view, i);
+    case 'object':
+      return packObject(value, field.fields, view, i);
   }
 
   return 0;
@@ -281,7 +285,8 @@ function packDate(
 }
 
 function packArray(values: any[], type: any, view?: DataView, i0?: number) {
-  let i = i0 || 0;
+  i0 = i0 || 0;
+  let i = i0;
   i += packVarInt(values.length, view, i0);
 
   const nullOffset = i;
@@ -306,5 +311,18 @@ function packArray(values: any[], type: any, view?: DataView, i0?: number) {
     }
   }
 
-  return i - (i0 || 0);
+  return i - i0;
+}
+
+function packObject(
+  value: any,
+  fields: Field[],
+  view?: DataView,
+  i0?: number,
+): number {
+  const schema: SchemaPlus = {
+    nullBytes: countNullables(fields),
+    fields,
+  };
+  return packRow(schema, value, view, i0);
 }
