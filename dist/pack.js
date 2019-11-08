@@ -23,7 +23,7 @@ function pack(rows, inSchema) {
 exports.pack = pack;
 // Measurement
 function measure(schema, rows) {
-    const { fields, nullBytes, selfDescribing } = schema;
+    const { fields, selfDescribing } = schema;
     const headerLength = selfDescribing
         ? 2 + 1 + fields.reduce((total, field) => total + measureField(field), 0)
         : 0;
@@ -116,6 +116,9 @@ function packRow({ fields, nullBytes }, row, view, i0) {
     return i - i0;
 }
 function packValue(field, value, view, i) {
+    if (!view) {
+        validate_1.validateValue(value, field);
+    }
     if (value === null || value === undefined) {
         return 0;
     }

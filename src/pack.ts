@@ -29,7 +29,7 @@ export function pack<T = any>(rows: T[], inSchema: Schema): ArrayBuffer {
 // Measurement
 
 function measure<T = any>(schema: SchemaPlus, rows: T[]): number {
-  const { fields, nullBytes, selfDescribing } = schema;
+  const { fields, selfDescribing } = schema;
   const headerLength = selfDescribing
     ? 2 + 1 + fields.reduce((total, field) => total + measureField(field), 0)
     : 0;
@@ -156,6 +156,10 @@ function packValue(
   view?: DataView,
   i?: number,
 ): number {
+  if (!view) {
+    validateValue(value, field);
+  }
+
   if (value === null || value === undefined) {
     return 0;
   }

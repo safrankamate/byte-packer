@@ -1,5 +1,5 @@
 import { Schema, Field, TypeCodes, DatePrecisions } from './schema';
-import { validateSchema, fail } from './validate';
+import { validateSchema, assert } from './validate';
 
 interface SchemaPlus extends Schema {
   nullBytes: number;
@@ -60,7 +60,7 @@ function unpackSchema(view: DataView, fields: Field[], i0: number): number {
 function unpackField(view: DataView, fields: Field[], i0: number): number {
   const typeByte = view.getUint8(i0);
   const type = TypeCodes[typeByte & 0b00001111];
-  if (!type) fail(`Invalid type byte ${typeByte} at index ${i0}`);
+  assert(!!type, `Invalid type byte ${typeByte} at index ${i0}`);
 
   const nullable = !!(typeByte & HIGH_1);
   const [name, nameLength] = unpackString(view, i0 + 1);
@@ -71,8 +71,10 @@ function unpackField(view: DataView, fields: Field[], i0: number): number {
   if (field.type === 'enum') {
     field.enumOf = [];
     const optionCount = view.getUint8(i++);
-    if (optionCount === 0)
-      fail(`Enum field ${name} in self-describing schema has option count 0.`);
+    assert(
+      optionCount > 0,
+      `Enum field ${name} in self-describing schema has option count 0.`,
+    );
 
     for (let o = 0; o < optionCount; o++) {
       const [option, optionLength] = unpackString(view, i);
@@ -193,8 +195,10 @@ function unpackVarInt(view: DataView, i: number, codes: number[]): number {
 
   for (let b = 1; b < bytes; b++) {
     const byte = view.getUint8(i + b);
-    if ((byte & 0b11000000) !== HIGH_1)
-      fail(`Byte at index ${i + b} is not part of a valid UTF-8 sequence.`);
+    assert(
+      (byte & 0b11000000) === HIGH_1,
+      `Byte at index ${i + b} is not part of a valid UTF-8 sequence.`,
+    );
 
     value = (value << 6) | (byte & 0b00111111);
   }

@@ -46,8 +46,7 @@ function unpackSchema(view, fields, i0) {
 function unpackField(view, fields, i0) {
     const typeByte = view.getUint8(i0);
     const type = schema_1.TypeCodes[typeByte & 0b00001111];
-    if (!type)
-        validate_1.fail(`Invalid type byte ${typeByte} at index ${i0}`);
+    validate_1.assert(!!type, `Invalid type byte ${typeByte} at index ${i0}`);
     const nullable = !!(typeByte & HIGH_1);
     const [name, nameLength] = unpackString(view, i0 + 1);
     const field = { name, type, nullable };
@@ -55,8 +54,7 @@ function unpackField(view, fields, i0) {
     if (field.type === 'enum') {
         field.enumOf = [];
         const optionCount = view.getUint8(i++);
-        if (optionCount === 0)
-            validate_1.fail(`Enum field ${name} in self-describing schema has option count 0.`);
+        validate_1.assert(optionCount > 0, `Enum field ${name} in self-describing schema has option count 0.`);
         for (let o = 0; o < optionCount; o++) {
             const [option, optionLength] = unpackString(view, i);
             field.enumOf.push(option);
@@ -159,8 +157,7 @@ function unpackVarInt(view, i, codes) {
     value = (first & 0xff) >>> bytes;
     for (let b = 1; b < bytes; b++) {
         const byte = view.getUint8(i + b);
-        if ((byte & 0b11000000) !== HIGH_1)
-            validate_1.fail(`Byte at index ${i + b} is not part of a valid UTF-8 sequence.`);
+        validate_1.assert((byte & 0b11000000) === HIGH_1, `Byte at index ${i + b} is not part of a valid UTF-8 sequence.`);
         value = (value << 6) | (byte & 0b00111111);
     }
     codes.push(value);

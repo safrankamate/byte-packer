@@ -1,6 +1,6 @@
 {
   "name": "byte-packer",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Pack arrays of similar objects into a binary format for transportation.",
   "repository": {
     "type": "git",
