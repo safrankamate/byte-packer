@@ -1,7 +1,6 @@
 import { Schema, Field, TypeCodes, DatePrecisions, TypeName } from './schema';
-import { validatePack, validateValue } from './validate';
+import { validatePack, createValidator, Validator } from './validate';
 
-type Validator = (value: any) => void;
 type Packer = (value: any, view?: DataView, i?: number) => number;
 type PackerFactory = (field: Field) => Packer;
 
@@ -53,12 +52,6 @@ function createPacker(field: Field): Packer {
   return (value, view, i) => {
     if (value === null || value === undefined) return 0;
     return packer(value, view, i);
-  };
-}
-
-function createValidator(field: Field): Validator {
-  return value => {
-    validateValue(value, field);
   };
 }
 
