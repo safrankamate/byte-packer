@@ -30,21 +30,26 @@ export function pack<T = any>(rows: T[], inSchema: Schema): ArrayBuffer {
 
 // Preparation
 
-function createPackingSchema(inSchema: Schema): PackingSchema {
-  const nullBytes = countNullables(inSchema.fields);
-  const validators = {};
-  const packers = {};
-  for (const field of inSchema.fields) {
-    packers[field.name] = createPacker(field);
-    validators[field.name] = createValidator(field);
-  }
+const schemaCache = new WeakMap<Schema, PackingSchema>();
 
-  return {
-    ...inSchema,
-    nullBytes,
-    validators,
-    packers,
-  };
+function createPackingSchema(inSchema: Schema): PackingSchema {
+  if (!schemaCache.has(inSchema)) {
+    const nullBytes = countNullables(inSchema.fields);
+    const validators = {};
+    const packers = {};
+    for (const field of inSchema.fields) {
+      packers[field.name] = createPacker(field);
+      validators[field.name] = createValidator(field);
+    }
+
+    schemaCache.set(inSchema, {
+      ...inSchema,
+      nullBytes,
+      validators,
+      packers,
+    });
+  }
+  return schemaCache.get(inSchema);
 }
 
 function createPacker(field: Field): Packer {

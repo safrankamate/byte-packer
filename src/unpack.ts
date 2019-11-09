@@ -32,18 +32,23 @@ export function unpack<T = any>(buffer: ArrayBuffer, inSchema?: Schema): T[] {
   return rows;
 }
 
-function createUnpackingSchema(inSchema: Schema): UnpackingSchema {
-  const nullBytes = inSchema ? countNullables(inSchema.fields) : 0;
-  const unpackers = {};
-  for (const field of inSchema.fields) {
-    unpackers[field.name] = Unpackers[field.type](field);
-  }
+const schemaCache = new WeakMap<Schema, UnpackingSchema>();
 
-  return {
-    ...inSchema,
-    nullBytes,
-    unpackers,
-  };
+function createUnpackingSchema(inSchema: Schema): UnpackingSchema {
+  if (!schemaCache.has(inSchema)) {
+    const nullBytes = inSchema ? countNullables(inSchema.fields) : 0;
+    const unpackers = {};
+    for (const field of inSchema.fields) {
+      unpackers[field.name] = Unpackers[field.type](field);
+    }
+
+    schemaCache.set(inSchema, {
+      ...inSchema,
+      nullBytes,
+      unpackers,
+    });
+  }
+  return schemaCache.get(inSchema);
 }
 
 function createUnpacker(field: Field): Unpacker {
