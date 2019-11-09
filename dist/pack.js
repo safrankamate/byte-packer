@@ -4,10 +4,7 @@ const schema_1 = require("./schema");
 const validate_1 = require("./validate");
 function pack(rows, inSchema) {
     validate_1.validatePack(rows, inSchema);
-    const schema = {
-        ...inSchema,
-        nullBytes: countNullables(inSchema.fields),
-    };
+    const schema = createPackingSchema(inSchema);
     const length = measure(schema, rows);
     const buffer = new ArrayBuffer(length);
     const view = new DataView(buffer);
@@ -21,13 +18,41 @@ function pack(rows, inSchema) {
     return buffer;
 }
 exports.pack = pack;
+// Preparation
+const schemaCache = new WeakMap();
+function createPackingSchema(inSchema) {
+    if (!schemaCache.has(inSchema)) {
+        const nullBytes = countNullables(inSchema.fields);
+        const validators = {};
+        const packers = {};
+        for (const field of inSchema.fields) {
+            packers[field.name] = createPacker(field);
+            validators[field.name] = validate_1.createValidator(field);
+        }
+        schemaCache.set(inSchema, {
+            ...inSchema,
+            nullBytes,
+            validators,
+            packers,
+        });
+    }
+    return schemaCache.get(inSchema);
+}
+function createPacker(field) {
+    const packer = Packers[field.type](field);
+    return (value, view, i) => {
+        if (value === null || value === undefined)
+            return 0;
+        return packer(value, view, i);
+    };
+}
 // Measurement
 function measure(schema, rows) {
     const { fields, selfDescribing } = schema;
     const headerLength = selfDescribing
         ? 2 + 1 + fields.reduce((total, field) => total + measureField(field), 0)
         : 0;
-    const bodyLength = rows.reduce((total, row) => total + packRow(schema, row), 0);
+    const bodyLength = rows.reduce((total, row) => total + measureRow(schema, row), 0);
     return 1 + headerLength + bodyLength;
 }
 function countNullables(fields) {
@@ -51,7 +76,17 @@ function measureField(field) {
     }
     return bytes;
 }
-// Packing
+function measureRow(inSchema, row) {
+    const { nullBytes, fields, validators, packers } = inSchema;
+    let bytes = nullBytes;
+    for (let field of fields) {
+        const value = row[field.name];
+        validators[field.name](value);
+        bytes += packers[field.name](value);
+    }
+    return bytes;
+}
+// Packing - Header
 const HIGH_1 = 0b10000000;
 const LOW_BITS = 0b00111111;
 function packSchema(fields, view, i0) {
@@ -92,7 +127,8 @@ function packField(field, view, i0) {
     }
     return i - i0;
 }
-function packRow({ fields, nullBytes }, row, view, i0) {
+// Packing - rows and values
+function packRow({ fields, nullBytes, packers }, row, view, i0) {
     i0 = i0 || 0;
     let i = i0 + nullBytes;
     let nullables = 0;
@@ -105,7 +141,7 @@ function packRow({ fields, nullBytes }, row, view, i0) {
             }
             nullables++;
         }
-        i += packValue(field, value, view, i);
+        i += packers[field.name](value, view, i);
     }
     if (view) {
         for (let b = nullBytes - 1; b >= 0; b--) {
@@ -115,55 +151,69 @@ function packRow({ fields, nullBytes }, row, view, i0) {
     }
     return i - i0;
 }
-function packValue(field, value, view, i) {
-    if (!view) {
-        validate_1.validateValue(value, field);
-    }
-    if (value === null || value === undefined) {
-        return 0;
-    }
-    switch (field.type) {
-        case 'int8':
-            view && view.setInt8(i, value);
+const Packers = {
+    // Primitives
+    int8: () => (value, view, i) => {
+        view && view.setInt8(i, value);
+        return 1;
+    },
+    int16: () => (value, view, i) => {
+        view && view.setInt16(i, value);
+        return 2;
+    },
+    int32: () => (value, view, i) => {
+        view && view.setInt32(i, value);
+        return 4;
+    },
+    uint8: () => (value, view, i) => {
+        view && view.setUint8(i, value);
+        return 1;
+    },
+    uint16: () => (value, view, i) => {
+        view && view.setUint16(i, value);
+        return 2;
+    },
+    uint32: () => (value, view, i) => {
+        view && view.setUint32(i, value);
+        return 4;
+    },
+    boolean: () => (value, view, i) => {
+        view && view.setInt8(i, Number(!!value));
+        return 1;
+    },
+    float: () => (value, view, i) => {
+        view && view.setFloat32(i, value);
+        return 4;
+    },
+    varint: () => (value, view, i) => {
+        return packVarInt(value, view, i);
+    },
+    string: () => (value, view, i) => {
+        return packString(value, view, i);
+    },
+    // Complex types
+    enum: field => {
+        const { enumOf } = field;
+        return (value, view, i) => {
+            view && view.setUint8(i, enumOf.indexOf(value));
             return 1;
-        case 'int16':
-            view && view.setInt16(i, value);
-            return 2;
-        case 'int32':
-            view && view.setInt32(i, value);
-            return 4;
-        case 'uint8':
-            view && view.setUint8(i, value);
-            return 1;
-        case 'uint16':
-            view && view.setUint16(i, value);
-            return 2;
-        case 'uint32':
-            view && view.setUint32(i, value);
-            return 4;
-        case 'varint':
-            const bytes = packVarInt(value, view, i);
-            return bytes;
-        case 'float':
-            view && view.setFloat32(i, value);
-            return 4;
-        case 'boolean':
-            view && view.setUint8(i, Number(value));
-            return 1;
-        case 'enum':
-            view && view.setUint8(i, field.enumOf.indexOf(value));
-            return 1;
-        case 'string':
-            return packString(value, view, i);
-        case 'date':
-            return packDate(value, schema_1.DatePrecisions.indexOf(field.precision), view, i);
-        case 'array':
-            return packArray(value, field, view, i);
-        case 'object':
-            return packObject(value, field.fields, view, i);
-    }
-    return 0;
-}
+        };
+    },
+    date: field => {
+        const precIndex = schema_1.DatePrecisions.indexOf(field.precision);
+        return (value, view, i) => packDate(value, precIndex, view, i);
+    },
+    array: field => {
+        const { arrayOf } = field;
+        const packer = createPacker(arrayOf);
+        return (value, view, i) => packArray(value, arrayOf.nullable, packer, view, i);
+    },
+    object: field => {
+        const { fields } = field;
+        const subSchema = createPackingSchema({ fields });
+        return (value, view, i) => packRow(subSchema, value, view, i);
+    },
+};
 function packString(value, view, i0) {
     let bytes = 0;
     for (let c = 0; c < value.length; c++) {
@@ -236,19 +286,15 @@ function packDate(value, precIndex, view, i0) {
     }
     return bytes;
 }
-function packArray(values, type, view, i0) {
+function packArray(values, nullable, packItem, view, i0) {
     i0 = i0 || 0;
     let i = i0;
     i += packVarInt(values.length, view, i0);
     const nullOffset = i;
     const nullBytes = Math.ceil(values.length / 8);
-    if (type.arrayOf.nullable) {
+    if (nullable) {
         i += nullBytes;
     }
-    const valueType = {
-        ...type.arrayOf,
-        name: type.name,
-    };
     for (let j = 0; j < values.length; j++) {
         const value = values[j];
         if (view && (value === null || value === undefined)) {
@@ -258,15 +304,8 @@ function packArray(values, type, view, i0) {
             view.setUint8(nullByte, nullFlags | (1 << nullBit));
         }
         else {
-            i += packValue(valueType, value, view, i);
+            i += packItem(value, view, i);
         }
     }
     return i - i0;
-}
-function packObject(value, fields, view, i0) {
-    const schema = {
-        nullBytes: countNullables(fields),
-        fields,
-    };
-    return packRow(schema, value, view, i0);
 }

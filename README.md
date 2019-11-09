@@ -134,6 +134,77 @@ const persons = unpack(payload, schema);
 
 The resulting array will contain the same objects, in the same order, as they were sent.
 
+## 4. Packing/unpacking singleton objects
+
+Up to now, we have assumed that your payload consists only of the array of records. In practice, the body of an API response is usually an object, which contains some additional metadata besides the records, such as pagination info, etc.
+
+In such cases, you can simply wrap the object in an array when you pack it, and use array destructuring when you unpack it:
+
+```typescript
+// Define the schema of your API results
+// e.g. searching in a contact list
+const schema = {
+  fields: [
+    {
+      name: 'pagination',
+      type: 'object',
+      fields: [
+        { name: 'currentPage', type: 'uint8' },
+        { name: 'pageCount', type: 'uint8' },
+        { name: 'recordsPerPage', type: 'uint8' },
+        { name: 'recordCount', type: 'uint32' },
+      ],
+    },
+    {
+      name: 'records',
+      type: 'array',
+      arrayOf: {
+        type: 'object',
+        fields: [
+          { name: 'firstName', type: 'string' },
+          { name: 'lastName', type: 'string' },
+          { name: 'age', type: 'uint8' },
+        ],
+      },
+    },
+  ],
+};
+
+const searchResults = {
+  pagination: {
+    currentPage: 1,
+    pageCount: 2,
+    recordsPerPage: 3,
+    recordCount: 5,
+  },
+  records: [
+    {
+      firstName: 'John',
+      lastName: 'Doe',
+      age: 33,
+    },
+    {
+      firstName: 'Jane',
+      lastName: 'Doe',
+      age: 35,
+    },
+    {
+      firstName: 'Jackie',
+      lastName: 'Doe',
+      age: 26,
+    },
+  ],
+};
+
+// Wrap the object in an array when packing:
+const payload = pack([searchResults], schema);
+
+// Destructure from the array when unpacking:
+const [searchResults] = unpack(payload, schema);
+```
+
+Because BytePacker only stores raw values, this wrapping has no effect on the payload size.
+
 # Additional Features
 
 ## Nullable fields

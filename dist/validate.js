@@ -29,13 +29,16 @@ function validateSchema(schema) {
     return true;
 }
 exports.validateSchema = validateSchema;
-function validateValue(value, field) {
-    if (field.nullable && (value === null || value === undefined))
-        return;
-    assertField(field.name, value !== null && value !== undefined, 'Unallowed nullish value');
-    validateValueType(value, field);
+function createValidator(field) {
+    const validate = Validators[field.type](field);
+    return value => {
+        if (field.nullable && (value === null || value === undefined))
+            return;
+        assertField(field.name, value !== null && value !== undefined, 'Unallowed nullish value');
+        validate(value);
+    };
 }
-exports.validateValue = validateValue;
+exports.createValidator = createValidator;
 function validateField({ name, type, ...field }, names) {
     assert(!!name, 'Fields must have a name property.');
     assert(!!type, `Field ${name} has no type specified.`);
@@ -59,43 +62,63 @@ function validateArrayField(name, arrayOf) {
     validateField({ name: `${name}'s type definition`, ...arrayOf }, new Set());
 }
 // Input validation
-const IntegerTypes = new Set([
-    'int8',
-    'int16',
-    'int32',
-    'uint8',
-    'uin16',
-    'uint32',
-    'varint',
-]);
-function validateValueType(value, { name, type, ...field }) {
-    if (IntegerTypes.has(type)) {
-        assertField(name, Number.isInteger(value), `Non-integer value ${value}`);
-        assertField(name, (type === 'int8' && value >= -0x80 && value <= 0x7f) ||
-            (type === 'uint8' && value >= 0 && value <= 0xff) ||
-            (type === 'int16' && value >= -0x8000 && value <= 0x7fff) ||
-            (type === 'uint16' && value >= 0 && value <= 0xffff) ||
-            (type === 'int32' && value >= -0x80000000 && value <= 0x7fffffff) ||
-            (type === 'uint32' && value >= 0 && value <= 0xffffffff) ||
-            (type === 'varint' && value >= 0 && value <= 0x10ffff), `Out-of-range value ${value}`);
-        return;
-    }
-    if (type === 'float') {
-        assertField(name, Number.isFinite(value), `Non-numeric value ${value}`);
-    }
-    if (type === 'string') {
-        assertField(name, typeof value === 'string', `Non-string value ${value}`);
-    }
-    if (type === 'enum') {
-        assertField(name, typeof value === 'string', `Non-string value ${value}`);
-        assertField(name, field.enumOf.includes(value), `Value ${value} not listed in enum options`);
-    }
-    if (type === 'date') {
-        assertField(name, value instanceof Date, `Value ${value} is not a Date object`);
-    }
-    if (type === 'array') {
-        assertField(name, Array.isArray(value), `Value ${value} is not an array`);
-        assertField(name, field.arrayOf.nullable ||
+const Validators = {
+    int8: field => value => {
+        assertInteger(field.name, value);
+        assertRange(field.name, value, -0x80, 0x7f);
+    },
+    int16: field => value => {
+        assertInteger(field.name, value);
+        assertRange(field.name, value, -0x8000, 0x7fff);
+    },
+    int32: field => value => {
+        assertInteger(field.name, value);
+        assertRange(field.name, value, -0x80000000, 0x7fffffff);
+    },
+    uint8: field => value => {
+        assertInteger(field.name, value);
+        assertRange(field.name, value, 0, 0xff);
+    },
+    uint16: field => value => {
+        assertInteger(field.name, value);
+        assertRange(field.name, value, 0, 0xffff);
+    },
+    uint32: field => value => {
+        assertInteger(field.name, value);
+        assertRange(field.name, value, 0, 0xffffffff);
+    },
+    varint: field => value => {
+        assertInteger(field.name, value);
+        assertRange(field.name, value, 0, 0x10ffff);
+    },
+    float: field => value => {
+        assertField(field.name, Number.isFinite(value), `Non-numeric value ${value}`);
+    },
+    boolean: field => value => {
+        assertField(field.name, !!value === value, `Non-boolean value ${value}`);
+    },
+    string: field => value => {
+        assertField(field.name, typeof value === 'string', `Non-string value ${value}`);
+    },
+    enum: field => value => {
+        assertField(field.name, typeof value === 'string', `Non-string value ${value}`);
+        assertField(field.name, field.enumOf.includes(value), `Value ${value} not listed in enum options`);
+    },
+    date: field => value => {
+        assertField(field.name, value instanceof Date, `Value ${value} is not a Date object`);
+    },
+    array: field => value => {
+        assertField(field.name, Array.isArray(value), `Value ${value} is not an array`);
+        assertField(field.name, field.arrayOf.nullable ||
             value.every((item) => item !== null), `Null value in non-nullable array`);
-    }
+    },
+    object: field => value => {
+        assertField(field.name, typeof value === 'object', `Non-object value ${value}`);
+    },
+};
+function assertInteger(name, value) {
+    assertField(name, Number.isInteger(value), `Non-integer value ${value}`);
+}
+function assertRange(name, value, from, to) {
+    assertField(name, value >= from && value <= to, `Out-of-range value ${value}`);
 }

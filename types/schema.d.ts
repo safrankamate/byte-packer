@@ -6,7 +6,7 @@ export declare type Field = {
     name: string;
     nullable?: boolean;
 } & TypeDef;
-declare type TypeName = SimpleName | EnumName | DateName | ArrayName | ObjectName;
+export declare type TypeName = SimpleName | EnumName | DateName | ArrayName | ObjectName;
 declare type TypeDef = SimpleType | EnumType | DateType | ArrayType | ObjectType;
 declare type SimpleName = 'int8' | 'int16' | 'int32' | 'uint8' | 'uint16' | 'uint32' | 'varint' | 'float' | 'boolean' | 'string';
 declare type SimpleType = {
