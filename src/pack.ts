@@ -1,17 +1,20 @@
-import { Schema, Field, TypeCodes, DatePrecisions } from './schema';
+import { Schema, Field, TypeCodes, DatePrecisions, TypeName } from './schema';
 import { validatePack, validateValue } from './validate';
 
-interface SchemaPlus extends Schema {
+type Validator = (value: any) => void;
+type Packer = (value: any, view?: DataView, i?: number) => number;
+type PackerFactory = (field: Field) => Packer;
+
+interface PackingSchema extends Schema {
   nullBytes: number;
+  validators: Record<string, Validator>;
+  packers: Record<string, Packer>;
 }
 
 export function pack<T = any>(rows: T[], inSchema: Schema): ArrayBuffer {
   validatePack(rows, inSchema);
 
-  const schema: SchemaPlus = {
-    ...inSchema,
-    nullBytes: countNullables(inSchema.fields),
-  };
+  const schema = createPackingSchema(inSchema);
   const length = measure(schema, rows);
 
   const buffer = new ArrayBuffer(length);
@@ -26,15 +29,48 @@ export function pack<T = any>(rows: T[], inSchema: Schema): ArrayBuffer {
   return buffer;
 }
 
+// Preparation
+
+function createPackingSchema(inSchema: Schema): PackingSchema {
+  const nullBytes = countNullables(inSchema.fields);
+  const validators = {};
+  const packers = {};
+  for (const field of inSchema.fields) {
+    packers[field.name] = createPacker(field);
+    validators[field.name] = createValidator(field);
+  }
+
+  return {
+    ...inSchema,
+    nullBytes,
+    validators,
+    packers,
+  };
+}
+
+function createPacker(field: Field): Packer {
+  const packer = Packers[field.type](field);
+  return (value, view, i) => {
+    if (value === null || value === undefined) return 0;
+    return packer(value, view, i);
+  };
+}
+
+function createValidator(field: Field): Validator {
+  return value => {
+    validateValue(value, field);
+  };
+}
+
 // Measurement
 
-function measure<T = any>(schema: SchemaPlus, rows: T[]): number {
+function measure<T = any>(schema: PackingSchema, rows: T[]): number {
   const { fields, selfDescribing } = schema;
   const headerLength = selfDescribing
     ? 2 + 1 + fields.reduce((total, field) => total + measureField(field), 0)
     : 0;
   const bodyLength = rows.reduce(
-    (total, row) => total + packRow(schema, row),
+    (total, row) => total + measureRow(schema, row),
     0,
   );
 
@@ -67,7 +103,20 @@ function measureField(field: Field): number {
   return bytes;
 }
 
-// Packing
+function measureRow(inSchema: PackingSchema, row: any): number {
+  const { nullBytes, fields, validators, packers } = inSchema;
+  let bytes = nullBytes;
+
+  for (let field of fields) {
+    const value = row[field.name];
+    validators[field.name](value);
+    bytes += packers[field.name](value);
+  }
+
+  return bytes;
+}
+
+// Packing - Header
 
 const HIGH_1 = 0b10000000;
 const LOW_BITS = 0b00111111;
@@ -117,8 +166,10 @@ function packField(field: Field, view: DataView, i0: number): number {
   return i - i0;
 }
 
+// Packing - rows and values
+
 function packRow(
-  { fields, nullBytes }: SchemaPlus,
+  { fields, nullBytes, packers }: PackingSchema,
   row: any,
   view?: DataView,
   i0?: number,
@@ -137,7 +188,7 @@ function packRow(
       }
       nullables++;
     }
-    i += packValue(field, value, view, i);
+    i += packers[field.name](value, view, i);
   }
 
   if (view) {
@@ -150,63 +201,76 @@ function packRow(
   return i - i0;
 }
 
-function packValue(
-  field: Field,
-  value: any,
-  view?: DataView,
-  i?: number,
-): number {
-  if (!view) {
-    validateValue(value, field);
-  }
+const Packers: Record<TypeName, PackerFactory> = {
+  // Primitives
 
-  if (value === null || value === undefined) {
-    return 0;
-  }
+  int8: () => (value, view, i) => {
+    view && view.setInt8(i, value);
+    return 1;
+  },
+  int16: () => (value, view, i) => {
+    view && view.setInt16(i, value);
+    return 2;
+  },
+  int32: () => (value, view, i) => {
+    view && view.setInt32(i, value);
+    return 4;
+  },
+  uint8: () => (value, view, i) => {
+    view && view.setUint8(i, value);
+    return 1;
+  },
+  uint16: () => (value, view, i) => {
+    view && view.setUint16(i, value);
+    return 2;
+  },
+  uint32: () => (value, view, i) => {
+    view && view.setUint32(i, value);
+    return 4;
+  },
+  boolean: () => (value, view, i) => {
+    view && view.setInt8(i, Number(!!value));
+    return 1;
+  },
+  float: () => (value, view, i) => {
+    view && view.setFloat32(i, value);
+    return 4;
+  },
+  varint: () => (value, view, i) => {
+    return packVarInt(value, view, i);
+  },
+  string: () => (value, view, i) => {
+    return packString(value, view, i);
+  },
 
-  switch (field.type) {
-    case 'int8':
-      view && view.setInt8(i, value);
-      return 1;
-    case 'int16':
-      view && view.setInt16(i, value);
-      return 2;
-    case 'int32':
-      view && view.setInt32(i, value);
-      return 4;
-    case 'uint8':
-      view && view.setUint8(i, value);
-      return 1;
-    case 'uint16':
-      view && view.setUint16(i, value);
-      return 2;
-    case 'uint32':
-      view && view.setUint32(i, value);
-      return 4;
-    case 'varint':
-      const bytes = packVarInt(value, view, i);
-      return bytes;
-    case 'float':
-      view && view.setFloat32(i, value);
-      return 4;
-    case 'boolean':
-      view && view.setUint8(i, Number(value));
-      return 1;
-    case 'enum':
-      view && view.setUint8(i, field.enumOf.indexOf(value));
-      return 1;
-    case 'string':
-      return packString(value, view, i);
-    case 'date':
-      return packDate(value, DatePrecisions.indexOf(field.precision), view, i);
-    case 'array':
-      return packArray(value, field, view, i);
-    case 'object':
-      return packObject(value, field.fields, view, i);
-  }
+  // Complex types
 
-  return 0;
-}
+  enum: field => {
+    const { enumOf } = field as any;
+    return (value, view, i) => {
+      view && view.setUint8(i, enumOf.indexOf(value));
+      return 1;
+    };
+  },
+
+  date: field => {
+    const precIndex = DatePrecisions.indexOf((field as any).precision);
+    return (value, view, i) => packDate(value, precIndex, view, i);
+  },
+
+  array: field => {
+    const { arrayOf } = field as any;
+    const packer = createPacker(arrayOf);
+    return (value, view, i) =>
+      packArray(value, arrayOf.nullable, packer, view, i);
+  },
+
+  object: field => {
+    const { fields } = field as any;
+    const subSchema = createPackingSchema({ fields });
+    return (value, view, i) => packRow(subSchema, value, view, i);
+  },
+};
 
 function packString(value: string, view?: DataView, i0?: number): number {
   let bytes = 0;
@@ -286,21 +350,23 @@ function packDate(
   return bytes;
 }
 
-function packArray(values: any[], type: any, view?: DataView, i0?: number) {
+function packArray(
+  values: any[],
+  nullable: boolean,
+  packItem: Packer,
+  view?: DataView,
+  i0?: number,
+) {
   i0 = i0 || 0;
   let i = i0;
   i += packVarInt(values.length, view, i0);
 
   const nullOffset = i;
   const nullBytes = Math.ceil(values.length / 8);
-  if (type.arrayOf.nullable) {
+  if (nullable) {
     i += nullBytes;
   }
 
-  const valueType = {
-    ...type.arrayOf,
-    name: type.name,
-  };
   for (let j = 0; j < values.length; j++) {
     const value = values[j];
     if (view && (value === null || value === undefined)) {
@@ -309,22 +375,9 @@ function packArray(values: any[], type: any, view?: DataView, i0?: number) {
       const nullFlags = view.getUint8(nullByte);
       view.setUint8(nullByte, nullFlags | (1 << nullBit));
     } else {
-      i += packValue(valueType, value, view, i);
+      i += packItem(value, view, i);
     }
   }
 
   return i - i0;
-}
-
-function packObject(
-  value: any,
-  fields: Field[],
-  view?: DataView,
-  i0?: number,
-): number {
-  const schema: SchemaPlus = {
-    nullBytes: countNullables(fields),
-    fields,
-  };
-  return packRow(schema, value, view, i0);
 }

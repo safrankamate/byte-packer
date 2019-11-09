@@ -8,7 +8,12 @@ export type Field = {
   nullable?: boolean;
 } & TypeDef;
 
-type TypeName = SimpleName | EnumName | DateName | ArrayName | ObjectName;
+export type TypeName =
+  | SimpleName
+  | EnumName
+  | DateName
+  | ArrayName
+  | ObjectName;
 type TypeDef = SimpleType | EnumType | DateType | ArrayType | ObjectType;
 
 type SimpleName =
