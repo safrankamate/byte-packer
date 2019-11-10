@@ -21,7 +21,7 @@ const FieldTypes = new Set<string>(Object.values(Types));
 export function validatePack(rows: any | any[], schema: Schema): boolean {
   if (schema.asSingleton) {
     assert(
-      Array.isArray(rows),
+      !Array.isArray(rows),
       'First argument of pack() must be an object for singleton payloads.',
     );
   } else {

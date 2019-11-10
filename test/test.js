@@ -4,6 +4,7 @@ const ALL_SUITES = [
   'arrays',
   'objects',
   'complex',
+  'singleton',
   'errors',
   'compare',
 ];
