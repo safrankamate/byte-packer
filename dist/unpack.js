@@ -2,10 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const schema_1 = require("./schema");
 const validate_1 = require("./validate");
+const constants_1 = require("./constants");
 function unpack(buffer, inSchema) {
     const view = new DataView(buffer);
     let i = 1;
-    if (hasSchema(view)) {
+    if (hasFeature(view, constants_1.Features.selfDescribing)) {
         inSchema = { fields: [] };
         i += 2;
         i += unpackSchema(view, inSchema.fields, i);
@@ -18,10 +19,16 @@ function unpack(buffer, inSchema) {
     }
     const schema = createUnpackingSchema(inSchema);
     const rows = [];
-    while (i < buffer.byteLength) {
-        i += unpackRow(schema, view, i, rows);
+    if (asSingleton(view, schema)) {
+        unpackRow(schema, view, i, rows);
+        return rows[0];
     }
-    return rows;
+    else {
+        while (i < buffer.byteLength) {
+            i += unpackRow(schema, view, i, rows);
+        }
+        return rows;
+    }
 }
 exports.unpack = unpack;
 const schemaCache = new WeakMap();
@@ -44,13 +51,20 @@ function createUnpacker(field) {
     const unpack = Unpackers[field.type](field);
     return (view, i) => unpack(view, i);
 }
-const HIGH_1 = 0b10000000;
 function countNullables(fields) {
     return Math.ceil(fields.reduce((counter, field) => counter + Number(field.nullable || false), 0) / 8);
 }
 // Schema unpacking
-function hasSchema(view) {
-    return !!(view.getUint8(0) & HIGH_1);
+function hasFeature(view, feature) {
+    return !!(view.getUint8(0) & feature);
+}
+function asSingleton(view, schema) {
+    if (schema.asSingleton !== undefined) {
+        return true;
+    }
+    else {
+        return hasFeature(view, constants_1.Features.asSingleton);
+    }
 }
 function unpackSchema(view, fields, i0) {
     const fieldCount = view.getUint8(i0);
@@ -64,7 +78,7 @@ function unpackField(view, fields, i0) {
     const typeByte = view.getUint8(i0);
     const type = schema_1.TypeCodes[typeByte & 0b00001111];
     validate_1.assert(!!type, `Invalid type byte ${typeByte} at index ${i0}`);
-    const nullable = !!(typeByte & HIGH_1);
+    const nullable = !!(typeByte & constants_1.HIGH_1);
     const [name, nameLength] = unpackString(view, i0 + 1);
     const field = { name, type, nullable };
     let i = i0 + 1 + nameLength;
@@ -173,14 +187,14 @@ function unpackVarInt(view, i, codes) {
     let value = 0;
     let bytes = 0;
     let first = view.getUint8(i);
-    while (first & HIGH_1) {
+    while (first & constants_1.HIGH_1) {
         bytes++;
         first = first << 1;
     }
     value = (first & 0xff) >>> bytes;
     for (let b = 1; b < bytes; b++) {
         const byte = view.getUint8(i + b);
-        validate_1.assert((byte & 0b11000000) === HIGH_1, `Byte at index ${i + b} is not part of a valid UTF-8 sequence.`);
+        validate_1.assert((byte & 0b11000000) === constants_1.HIGH_1, `Byte at index ${i + b} is not part of a valid UTF-8 sequence.`);
         value = (value << 6) | (byte & 0b00111111);
     }
     codes.push(value);

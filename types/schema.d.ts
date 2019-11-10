@@ -1,6 +1,7 @@
 export interface Schema {
     fields: Field[];
     selfDescribing?: boolean;
+    asSingleton?: boolean;
 }
 export declare type Field = {
     name: string;

@@ -134,77 +134,6 @@ const persons = unpack(payload, schema);
 
 The resulting array will contain the same objects, in the same order, as they were sent.
 
-## 4. Packing/unpacking singleton objects
-
-Up to now, we have assumed that your payload consists only of the array of records. In practice, the body of an API response is usually an object, which contains some additional metadata besides the records, such as pagination info, etc.
-
-In such cases, you can simply wrap the object in an array when you pack it, and use array destructuring when you unpack it:
-
-```typescript
-// Define the schema of your API results
-// e.g. searching in a contact list
-const schema = {
-  fields: [
-    {
-      name: 'pagination',
-      type: 'object',
-      fields: [
-        { name: 'currentPage', type: 'uint8' },
-        { name: 'pageCount', type: 'uint8' },
-        { name: 'recordsPerPage', type: 'uint8' },
-        { name: 'recordCount', type: 'uint32' },
-      ],
-    },
-    {
-      name: 'records',
-      type: 'array',
-      arrayOf: {
-        type: 'object',
-        fields: [
-          { name: 'firstName', type: 'string' },
-          { name: 'lastName', type: 'string' },
-          { name: 'age', type: 'uint8' },
-        ],
-      },
-    },
-  ],
-};
-
-const searchResults = {
-  pagination: {
-    currentPage: 1,
-    pageCount: 2,
-    recordsPerPage: 3,
-    recordCount: 5,
-  },
-  records: [
-    {
-      firstName: 'John',
-      lastName: 'Doe',
-      age: 33,
-    },
-    {
-      firstName: 'Jane',
-      lastName: 'Doe',
-      age: 35,
-    },
-    {
-      firstName: 'Jackie',
-      lastName: 'Doe',
-      age: 26,
-    },
-  ],
-};
-
-// Wrap the object in an array when packing:
-const payload = pack([searchResults], schema);
-
-// Destructure from the array when unpacking:
-const [searchResults] = unpack(payload, schema);
-```
-
-Because BytePacker only stores raw values, this wrapping has no effect on the payload size.
-
 # Additional Features
 
 ## Nullable fields
@@ -272,6 +201,81 @@ const coordinates = unpack(payload); // <-- No schema needed!
 ```
 
 _Note: If `unpack()` is called with a self-describing payload **and** a schema object, it will use the schema that is included in the payload, and ignore the argument. The `selfDescribing` flag has no effect when unpacking._
+
+## Singleton objects
+
+Up to now, we have assumed that your payload consists only of the array of records. In practice, the body of an API response is usually an object, which contains some additional metadata besides the records, such as pagination info, etc.
+
+From version **1.5.0** onward, you can include an `asSingleton` flag in your schema for this purpose:
+
+- If `asSingleton` is set to `true` when packing, `pack()` will expect a single object (instead of an array of objects) as its first argument. A feature flag will be set on the payload to indicate that it contains a singleton.
+- If `asSingleton` is set to `true` when unpacking, `unpack()` will return a single object. If the payload was not packed as a singleton, only the first object in the array will be unpacked.
+- If `asSingleton` is explicitly set to `false` when unpacking, `unpack()` will return an array of objects. If the payload was packed as a singleton, it will be wrapped in an array.
+- If `asSingleton` is not specified when unpacking, `unpack()` will check the feature flag in the payload, and return a singleton or an array accordingly.
+
+```typescript
+const searchResults = {
+  pagination: {
+    currentPage: 1,
+    pageCount: 2,
+    recordsPerPage: 3,
+    recordCount: 5,
+  },
+  records: [
+    {
+      firstName: 'John',
+      lastName: 'Doe',
+      age: 33,
+    },
+    {
+      firstName: 'Jane',
+      lastName: 'Doe',
+      age: 35,
+    },
+    {
+      firstName: 'Jackie',
+      lastName: 'Doe',
+      age: 26,
+    },
+  ],
+};
+
+// Define the schema of your API results
+// e.g. searching in a contact list
+const schema = {
+  asSingleton: true,
+  fields: [
+    {
+      name: 'pagination',
+      type: 'object',
+      fields: [
+        { name: 'currentPage', type: 'uint8' },
+        { name: 'pageCount', type: 'uint8' },
+        { name: 'recordsPerPage', type: 'uint8' },
+        { name: 'recordCount', type: 'uint32' },
+      ],
+    },
+    {
+      name: 'records',
+      type: 'array',
+      arrayOf: {
+        type: 'object',
+        fields: [
+          { name: 'firstName', type: 'string' },
+          { name: 'lastName', type: 'string' },
+          { name: 'age', type: 'uint8' },
+        ],
+      },
+    },
+  ],
+};
+
+// Pack the object as a singleton:
+const payload = pack(searchResults, schema);
+
+// Unpack as a singleton:
+const searchResults = unpack(payload, schema);
+```
 
 # API Reference
 
@@ -395,9 +399,12 @@ If you need to create your own implementation of BytePacker for your non-JS back
 
 ## Feature byte
 
-| **data**         | **length** | **description**                                                                                                                                      |
-| ---------------- | ---------: | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **feature byte** |         1B | The first byte of the payload is 0 if it's not self-describing, and 1 if it is. Additional bits may be set to indicate other features in the future. |
+The first byte of the payload is the **feature byte**: its individual bits are used to flag certain features of the payload. Currently, the following bits are used:
+
+| **bit**    | **feature**                                    |
+| ---------- | ---------------------------------------------- |
+| `10000000` | This payload is self-describing.               |
+| `01000000` | This payload was packed as a singleton object. |
 
 ## Field definitions (optional)
 

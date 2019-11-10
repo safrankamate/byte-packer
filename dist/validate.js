@@ -12,7 +12,12 @@ function assertField(name, condition, message) {
 }
 const FieldTypes = new Set(Object.values(schema_1.Types));
 function validatePack(rows, schema) {
-    assert(Array.isArray(rows), 'First argument of pack() must be an array.');
+    if (schema.asSingleton) {
+        assert(!Array.isArray(rows), 'First argument of pack() must be an object for singleton payloads.');
+    }
+    else {
+        assert(Array.isArray(rows), 'First argument of pack() must be an array for non-singleton payloads.');
+    }
     if (schema) {
         validateSchema(schema);
     }

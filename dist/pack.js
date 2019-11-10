@@ -2,12 +2,17 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const schema_1 = require("./schema");
 const validate_1 = require("./validate");
+const constants_1 = require("./constants");
 function pack(rows, inSchema) {
     validate_1.validatePack(rows, inSchema);
+    if (!Array.isArray(rows)) {
+        rows = [rows];
+    }
     const schema = createPackingSchema(inSchema);
     const length = measure(schema, rows);
     const buffer = new ArrayBuffer(length);
     const view = new DataView(buffer);
+    packFeatures(schema, view);
     let i = 1;
     if (schema.selfDescribing) {
         i += packSchema(schema.fields, view, i);
@@ -87,10 +92,17 @@ function measureRow(inSchema, row) {
     return bytes;
 }
 // Packing - Header
-const HIGH_1 = 0b10000000;
-const LOW_BITS = 0b00111111;
+function packFeatures(schema, view) {
+    let features = 0;
+    if (schema.selfDescribing) {
+        features |= constants_1.Features.selfDescribing;
+    }
+    if (schema.asSingleton) {
+        features |= constants_1.Features.asSingleton;
+    }
+    view.setUint8(0, features);
+}
 function packSchema(fields, view, i0) {
-    view.setUint8(0, view.getUint8(0) | HIGH_1);
     view.setUint8(i0 + 2, fields.length);
     let i = i0 + 3;
     for (const field of fields) {
@@ -101,7 +113,7 @@ function packSchema(fields, view, i0) {
     return headerLength;
 }
 function packField(field, view, i0) {
-    view.setUint8(i0, (field.nullable ? HIGH_1 : 0) | schema_1.TypeCodes.indexOf(field.type));
+    view.setUint8(i0, (field.nullable ? constants_1.HIGH_1 : 0) | schema_1.TypeCodes.indexOf(field.type));
     let i = i0 + 1;
     i += packString(field.name, view, i);
     if (field.type === 'enum') {
@@ -236,24 +248,24 @@ function packVarInt(value, view, i) {
     else if (value < 0x800) {
         if (view) {
             view.setUint8(i, 0b11000000 | (value >>> 6));
-            view.setUint8(i + 1, HIGH_1 | (value & LOW_BITS));
+            view.setUint8(i + 1, constants_1.HIGH_1 | (value & constants_1.LOW_BITS));
         }
         return 2;
     }
     else if (value < 0x10000) {
         if (view) {
             view.setUint8(i, 0b11100000 | (value >>> 12));
-            view.setUint8(i + 1, HIGH_1 | ((value >>> 6) & LOW_BITS));
-            view.setUint8(i + 2, HIGH_1 | (value & LOW_BITS));
+            view.setUint8(i + 1, constants_1.HIGH_1 | ((value >>> 6) & constants_1.LOW_BITS));
+            view.setUint8(i + 2, constants_1.HIGH_1 | (value & constants_1.LOW_BITS));
         }
         return 3;
     }
     else if (value < 0x10ffff) {
         if (view) {
             view.setUint8(i, 0b11110000 | (value >>> 18));
-            view.setUint8(i + 1, HIGH_1 | ((value >>> 12) & LOW_BITS));
-            view.setUint8(i + 2, HIGH_1 | ((value >>> 6) & LOW_BITS));
-            view.setUint8(i + 3, HIGH_1 | (value & LOW_BITS));
+            view.setUint8(i + 1, constants_1.HIGH_1 | ((value >>> 12) & constants_1.LOW_BITS));
+            view.setUint8(i + 2, constants_1.HIGH_1 | ((value >>> 6) & constants_1.LOW_BITS));
+            view.setUint8(i + 3, constants_1.HIGH_1 | (value & constants_1.LOW_BITS));
         }
         return 4;
     }

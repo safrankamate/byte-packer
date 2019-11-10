@@ -1,2 +1,2 @@
 import { Schema } from './schema';
-export declare function pack<T = any>(rows: T[], inSchema: Schema): ArrayBuffer;
+export declare function pack<T = any>(rows: T[] | T, inSchema: Schema): ArrayBuffer;
