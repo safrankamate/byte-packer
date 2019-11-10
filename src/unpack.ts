@@ -1,5 +1,6 @@
 import { Schema, Field, TypeCodes, DatePrecisions, TypeName } from './schema';
 import { validateSchema, assert } from './validate';
+import { HIGH_1, Features } from './constants';
 
 type Unpacker = (view: DataView, i: number) => [any, number];
 type UnpackerFactory = (field: Field) => Unpacker;
@@ -9,10 +10,13 @@ interface UnpackingSchema extends Schema {
   unpackers: Record<string, Unpacker>;
 }
 
-export function unpack<T = any>(buffer: ArrayBuffer, inSchema?: Schema): T[] {
+export function unpack<T = any>(
+  buffer: ArrayBuffer,
+  inSchema?: Schema,
+): T[] | T {
   const view = new DataView(buffer);
   let i = 1;
-  if (hasSchema(view)) {
+  if (hasFeature(view, Features.selfDescribing)) {
     inSchema = { fields: [] };
     i += 2;
     i += unpackSchema(view, inSchema.fields, i);
@@ -26,10 +30,15 @@ export function unpack<T = any>(buffer: ArrayBuffer, inSchema?: Schema): T[] {
 
   const schema = createUnpackingSchema(inSchema);
   const rows: T[] = [];
-  while (i < buffer.byteLength) {
-    i += unpackRow(schema, view, i, rows);
+  if (asSingleton(view, schema)) {
+    unpackRow(schema, view, i, rows);
+    return rows[0];
+  } else {
+    while (i < buffer.byteLength) {
+      i += unpackRow(schema, view, i, rows);
+    }
+    return rows;
   }
-  return rows;
 }
 
 const schemaCache = new WeakMap<Schema, UnpackingSchema>();
@@ -56,8 +65,6 @@ function createUnpacker(field: Field): Unpacker {
   return (view, i) => unpack(view, i);
 }
 
-const HIGH_1 = 0b10000000;
-
 function countNullables(fields: Field[]): number {
   return Math.ceil(
     fields.reduce(
@@ -69,8 +76,16 @@ function countNullables(fields: Field[]): number {
 
 // Schema unpacking
 
-function hasSchema(view: DataView): boolean {
-  return !!(view.getUint8(0) & HIGH_1);
+function hasFeature(view: DataView, feature: number): boolean {
+  return !!(view.getUint8(0) & feature);
+}
+
+function asSingleton(view: DataView, schema: Schema): boolean {
+  if (schema.asSingleton !== undefined) {
+    return true;
+  } else {
+    return hasFeature(view, Features.asSingleton);
+  }
 }
 
 function unpackSchema(view: DataView, fields: Field[], i0: number): number {

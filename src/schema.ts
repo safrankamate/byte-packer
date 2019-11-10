@@ -1,6 +1,7 @@
 export interface Schema {
   fields: Field[];
   selfDescribing?: boolean;
+  asSingleton?: boolean;
 }
 
 export type Field = {

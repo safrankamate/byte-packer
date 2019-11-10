@@ -1,5 +1,6 @@
 import { Schema, Field, TypeCodes, DatePrecisions, TypeName } from './schema';
 import { validatePack, createValidator, Validator } from './validate';
+import { HIGH_1, LOW_BITS, Features } from './constants';
 
 type Packer = (value: any, view?: DataView, i?: number) => number;
 type PackerFactory = (field: Field) => Packer;
@@ -10,14 +11,20 @@ interface PackingSchema extends Schema {
   packers: Record<string, Packer>;
 }
 
-export function pack<T = any>(rows: T[], inSchema: Schema): ArrayBuffer {
+export function pack<T = any>(rows: T[] | T, inSchema: Schema): ArrayBuffer {
   validatePack(rows, inSchema);
+  if (!Array.isArray(rows)) {
+    rows = [rows];
+  }
 
   const schema = createPackingSchema(inSchema);
   const length = measure(schema, rows);
 
   const buffer = new ArrayBuffer(length);
   const view = new DataView(buffer);
+
+  packFeatures(schema, view);
+
   let i = 1;
   if (schema.selfDescribing) {
     i += packSchema(schema.fields, view, i);
@@ -116,11 +123,19 @@ function measureRow(inSchema: PackingSchema, row: any): number {
 
 // Packing - Header
 
-const HIGH_1 = 0b10000000;
-const LOW_BITS = 0b00111111;
+function packFeatures(schema: Schema, view: DataView) {
+  let features = 0;
+  if (schema.selfDescribing) {
+    features |= Features.selfDescribing;
+  }
+  if (schema.asSingleton) {
+    features |= Features.asSingleton;
+  }
+
+  view.setUint8(0, features);
+}
 
 function packSchema(fields: Field[], view: DataView, i0: number): number {
-  view.setUint8(0, view.getUint8(0) | HIGH_1);
   view.setUint8(i0 + 2, fields.length);
 
   let i = i0 + 3;

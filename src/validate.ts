@@ -18,8 +18,18 @@ function assertField(
 
 const FieldTypes = new Set<string>(Object.values(Types));
 
-export function validatePack(rows: any[], schema: Schema): boolean {
-  assert(Array.isArray(rows), 'First argument of pack() must be an array.');
+export function validatePack(rows: any | any[], schema: Schema): boolean {
+  if (schema.asSingleton) {
+    assert(
+      Array.isArray(rows),
+      'First argument of pack() must be an object for singleton payloads.',
+    );
+  } else {
+    assert(
+      Array.isArray(rows),
+      'First argument of pack() must be an array for non-singleton payloads.',
+    );
+  }
 
   if (schema) {
     validateSchema(schema);
